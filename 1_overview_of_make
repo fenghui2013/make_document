@@ -1,0 +1,26 @@
+1 make简介
+    make工具决定程序的哪些部分需要重新编译，且发出命令重新编译他们。该手册描述了GNU make，被Richard Stallman 和Roland McGrath
+实现。从版本3.76之后被Paul D.Smith接手。
+    GNU make遵守IEEE Standard 1003.2-1992的6.2节。
+    我们的例子是C程序，因为他们是常用的，但是你能在任何它的编译器能以shell命令运行的编程语言中使用make。事实上，make不局限于程
+序。你能使用make来描述任何任务，该任务中，无论何时其他文件被改变，一些文件会自动被更新。
+
+准备
+准备和运行Make
+    为了使用make，你必须写一个makefile文件，该文件描述了程序中文件之间的依赖关系且提供命令来更新每一个文件。典型的，在程序中，
+可执行文件(executable file)根据对象文件(object file)更新。反过来，对象文件通过编译源文件生成。
+    一旦拥有了一个正确的makefile文件，每次你改变一些源文件时，这个简单的shell命令:
+        make
+    将会执行所有必要的重新编译。make程序以makefile文件为基础，根据文件最后修改的时间来决定哪些文件需要被修改。For each of tho-
+se files, it issues the recipes recorded in the data base.
+    你能提供命令行参数到make来控制哪些文件应该被重新编译，或者是如何编译。See How to Run make.
+
+1.1 怎样阅读该手册
+    如果你是一个使用make的新手，或者只是想了解一下，阅读每章的前几节，跳过最后一节。在每章中，前几节描述了简介或者综合性信息。
+后面的章节描述了专业的或者技术性信息。除了第二章，Makefiles的介绍，该章所有内容都是介绍性的内容。
+    如果你熟悉其他的make程序，看Features of GNU make，列出了GNU make的增强版功能和Incompatibilities and Missikng Features，解
+释了GNU make缺失但是其他拥有的功能。
+    为了快速的浏览，see Options Summary, Quick Reference and Special Targets.
+
+1.2 问题和提bug
+    
