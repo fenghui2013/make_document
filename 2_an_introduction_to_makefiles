@@ -1,0 +1,180 @@
+2 Makefiles简介
+    你需要一个makefile文件来告诉make做什么。大多数情况下，makefile告诉make怎样编译和链接一个程序。
+    本章中，我们描述一个简单的makefile文件。该文件描述了怎样编译和链接一个文本编辑器，该文本编辑器包含8个C源文件和3个头文件。
+makefile也告诉了make怎样运行各种各样的命令。例如，为了删除某一文件的删除命令。为了看一个更复杂的makefile例子，see Complex Mak-
+efile.
+    当make重新编译编辑器时，改变C源文件的每个都要重新编译，包含头文件的每个C源文件必须被重新编译为了安全。每个编译产生一个与源
+文件相对应的对象文件。最后，如果所有的源文件已经被编译完，新被制作的或者是之前编译的所有对象文件必须被链接在一起为了产生新的可
+执行的编辑器。
+    * Rule Introduction        What a rule looks like
+    * Simple Makefile          A simple makefile
+    * How Make Works           How make processes this makefile
+    * Variables Simplify       Variables make makefiles simpler
+    * make Deduces             Letting make deduce the recipes
+    * Combine By Prerequisite  Anoter style of makefile
+    * Cleanup                  Rules for cleaning the directory
+
+2.1 规则(What a Rule Looks Like)
+    一个简单的makefile文件由如下形式组成:
+        target ... : prerequisites ...
+            recipe
+            ...
+            ...
+    target通常是被程序生成的文件名。targets的例子是可执行的或者对象文件。target也可以是一个指令(action)的名字，例如'clean'(see
+ Phony Targets).
+    prerequisite是作为输入被用来创建target的文件。一个target经常需要几个文件。
+    recipe是make执行的指令。一个recipe可能不止一个命令，或者是同一行或者是每行一个。请注意:你需要在每个recipe行之前放一个tab。
+如果你想修改recipe的前缀，你能设置.RECIPEPREFIX变量。(see Special Variables)
+    通常情况下，一个recipe是一个带有几个prerequisite的规则，如果prerequisite任何一个改变会产生一个新的target文件。然而，为tar-
+get指定recipe的规则不必有prerequisite。例如，包含和target相关的clean删除命令不需要prerequisite。
+    一个rule解释了怎样和什么时候重新编译某一文件，该文件是特定规则的目标。make执行prerequisite上的recipe来创建或更新target。r-
+ule也能解释怎样和什么时候执行指令。see Writing Rules
+    makefile可能会包含除rule的其他文本，但是一个简单的makefile仅需要包含rule。Rule可能看起来比在模板中展示的更复杂，但是所有或
+多或少适合该模式。
+
+2.2 简单的Makefile(A Simple Makefile)
+    这是一个简单的makefile，该文件描述了edit可执行文件依赖8个object文件(依赖8个C源文件和3个头文件)的方式。
+    在例子中，所有的C文件包含defs.h，但是仅有包含编辑命令的包含command.h文件，仅有几个改变编辑器缓冲区的低级文件包含buffer.h。
+        edit: main.o kbd.o command.o display.o \
+            insert.o search.o files.o utils.o
+            cc -o edit main.o kbd.o command.o display.o \
+                insert.o search.o files.o utils.o
+        main.o: main.c defs.h
+            cc -c main.c
+        kbd.o: kbd.c defs.h command.h
+            cc -c command.c
+        display.o: display.c defs.h buffer.h
+            cc -c display.c
+        insert.o: insert.c defs.h buffer.h
+            cc -c insert.c
+        search.o: search.c defs.h buffer.h
+            cc -c search.c
+        files.o: files.c defs.h buffer.h command.h
+            cc -c files.h
+        utils.o: utils.c defs.h
+            cc -c utils.c
+        clean:
+            rm -rf edit main.o kbd.o command.o display.o \
+                insert.o search.o files.o utils.o
+    我们使用反斜线将每个长行弄成两行。就像是使用一个长行，但是容易读。See Splitting Long Lines
+    为了使用该makefile创建可执行文件edit，键入:
+        make
+    为了使用该makefile删除可执行文件和所有的object file，键入:
+        make clean
+    在makefile例子中，target包含可执行文件'edit'和对象文件'main.o'和'kbd.o'。prerequisite是'main.c'和'defs.h'文件。事实上，每
+个'.o'文件即使一个target也是一个prerequisite。包含'cc -c main.c'和'cc -c kbd.c'的recipe依赖源文件main.c和头文件defs.h。
+    一个recipe可能遵循包含target和prerequisite的每行。这些recipe说明了怎样更新target文件。tab必须在recipe每行的开始为了区别re-
+cipe。(牢记一点，make不知道recipe是如何工作的。由你来决定recipe。当target文件需要被更新时，make做的仅是执行你指定的recipe)
+    目标'clean'不是一个文件，而是一个指令的名字。正常情况下，你不想在在该规则中执行指令，'clean'不是任何其他规则的prerequisite。
+因此，除非你告诉它，否则make什么也不做。注意，该规则不仅不是一个prerequisite，它也没有prerequisite，因此该规则的唯一目的是运行
+特定的recipe。不指向文件而是指令的target叫做phony target。为了这种target，看Phony Target。为了看怎样使make忽略来自rm或者任何其
+他命令的错误看Errors in Recipes。
+
+2.3 make怎样处理Makefile(How make Processes a Makefile)
+    默认情况下，make开始第一个target(不是名字以'.'开始的target)。被称为default goal。(goal是make最终努力更新的target。你能通过
+命令行(see Arguments to Specify the Goals)或者用特殊变量.DEFAULT_GOAL来覆盖此行为。)
+    在上节简单的makefile文件里，默认的goal是更新可执行程序edit。因此，我们首先写该规则。
+    因此，当你键入命令:
+        make
+    时，make读当前文件夹下的makefile，开始处理第一个rule。在该例子中，该rule是重新链接edit。但是在make处理该规则之前，它必须处
+理edit依赖文件的规则，在本例子中是对象文件。这些文件依据它自己的规则被处理。这些规则说明通过编译源文件来更新'.o'文件。如果被命
+名为prerequisite的源文件或者头文件比对象文件更近，或者如果对象文件不存在，那么重新编译必须被做。
+    其他的规则被处理，因为他们的target以goal的prerequisite出现。如果一些其他的规则不被goal依赖(或者依赖其他，等),那个规则就不
+会被处理，除非你告诉make做那个(使用命令例如make clean)。
+    在重新编译对象文件之前，make考虑更新它的prerequisite，源文件和头文件。makefile文件不会指定任何事情来做，'.c'和'.h'文件不是
+任何规则的target。因此make为这些文件什么都不做。但是make自动更新由他们自己的规则生成的C程序，例如被Bison或者Yacc制作的这些。
+    在重新编译需要它的对象文件之后，make决定是否重新链接edit。如果edit不存在或者如果对象文件比它更新的情况下会做。如果对象文件
+被重新编译，它比edit更新，因此edit被重新链接。
+    因此，如果我们改变文件insert.c和运行make，make将会重新编译该文件来更新insert.o，且随后重新链接edit。如果我们改变文件comman
+d.h和运行make，make将会重新编译对象文件kbd.o，command.o和files.o且随后链接文件edit。
+
+2.4 变量使makefile更简单(Variables Make Makefiles Simpler)
+    在我们的例子中，我们不得不为edit的规则中列出所有的对象文件两次:
+        edit: main.o kbd.o command.o display.o \
+            insert.o search.o files.o utils.o
+            cc -o edit main.o kbd.o command.o display.o \
+                insert.o search.o files.o utils.o
+    这种重复容易出现错误。如果新的对象文件被加入到系统中，我们增加它到一个列表里而忘了另一个。我们通过使用变量来消除风险和使ma
+kefile更简单。变量(Variable)允许文本字符串一次被定义，稍候在多个地方使用。(see How to Use Variables)
+    为每个makefile有一个objects，OBJECTS，objs，obj或者OBJ(是所有对象文件的列表)的变量是标准的实践。我们像这样在makefile文件中
+定义那样的变量objects:
+        objects = main.o kbd.o command.o display.o \
+                insert.o search.o files.o utils.o
+    那么，在每个我们想放这些变量的地方，我们通过写'$(objects)'来替换变量值。(see How to Use Variables)。
+    这是完整的简单的makefile当你使用变量为了对象文件:
+        objects = main.o kbd.o command.o display.o \
+                insert.o search.o files.o utils.o
+        edit: $(objects)
+            cc -o edit $(objects)
+        main.o: main.c defs.h
+            cc -c main.c
+        kbd.o: kbd.c defs.h command.h
+            cc -c kdb.c
+        command.o: command.c defs.h command.h
+            cc -c command.c
+        display.o: display.c defs.h buffer.h
+            cc -c display.c
+        insert.o: insert.c defs.h buffer.h
+            cc -c insert.c
+        search.o: search.c defs.h buffer.h
+            cc -c search.c
+        files.o: files.c defs.h buffer.h command.h
+            cc -c files.c
+        utils.o: utils.c defs.h
+            cc -c utils.c
+        clean:
+            rm edit $(objects)
+
+2.5.1 让make推导出recipe(Letting make Deduce the Recipes)
+    为了编译单个C源文件拼出recipe是不必的，因为make能figure them out:它有一个隐式的规则:使用'cc -c'命令和相应名字的'.c'文件更
+新'.o'文件。例如，它将使用'cc -c main.c -o main.o'来编译main.c到main.o。因此我们能为该对象文件省略recipe。see Using Implicit 
+Rules。
+    当'.c'文件以这种方式被自动使用时，它也自动被加入到prerequisite中。因此我们可以在prerequisite中省略'.c'文件。
+    这是一个完整的例子，带有所有的改变和使用一个变量objects:
+        objects = main.o kdb.o command.o display.o \
+            insert.o search.o files.o utils.o
+        edit: $(objects)
+            cc -o edit $(objects)
+        main.o: defs.h
+        kbd.o: defs.h command.h
+        command.o: defs.h command.h
+        display.o: defs.h buffer.h
+        insert.o: defs.h buffer.h
+        search.o: defs.h buffer.h
+        files.o: defs.h buffer.h command.h
+        utils.o: defs.h
+        
+        .PHONY： clean
+        clean:
+            rm edit $(objects)
+    这是我们在真实实践中如何写makefile。(和'clean'相关的编译被描述在其他地方。see Phony Targets和Errors in Recipes)
+    由于隐含的规则是那么的方便，他们是重要的。你将会看到他们被频繁的使用。
+
+2.6 另一种风格的makefile(Another Style of Makefile)
+    当makefile对象仅被隐含的规则创建时，另一种风格是可能的。在这种makefile风格中，通过prerequisite而不是通过target组织实例。看
+起来像这样:
+        objects = main.o kbd.o command.o display.o \
+                insert.o search.o files.o utils.o
+        edit: $(objects)
+            cc -o edit $(objects)
+        $(objects): defs.h
+        kdb.o command.o files.o: command.h
+        display.o insert.o search.o files.o: buffer.h
+    在这，defs.h作为所有对象文件的prerequisite。command.h和buffer.h是特定对象文件的prerequisite。
+    Whether this is better is a matter of taste. 它更紧凑，但是一些人不喜欢它，因为他们觉得将每个target的所有信息放在同一个地
+方是更清楚的。
+
+2.7 清除目录的规则(Rules for Cleaning the Directory)
+    编译一个程序不是你写规则的唯一目的。除了编译程序，makefile通常还会告知怎样做其他几个事情。例如，怎样删除所有的对象文件和可
+执行文件，以至于目录是干净的。
+    这是我们写make规则来清空editor的方法:
+        clean:
+            rm edit $(objects)
+    实践中，我们可能想以稍微更复杂的方式写规则来处理意外的情况。我们这样做:
+        .PHONY: clean
+        clean:
+            rm edit $(objects)
+    这会防止make被一个真实的clean文件搞混，且尽管出错了仍然继续。(see Phony Targets and Errors in Recipes)
+    该规则不应该放在makefile的开头，因为我们不想默认运行它。因此，在makefile例子中，我们想让重新编译edit的规则为默认的goal。
+    由于clean不是edit的prerequisite，如果我们该命令'make'，该规则不会运行。为了让规则运行，我们不得不键入'make clean'。see How 
+to Run make。
