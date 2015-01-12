@@ -1,0 +1,202 @@
+3 写makefile(Writing Makefiles)
+    告诉make怎样重新编译系统的信息被称为makefile。
+    * Makefile Contents:    What makefiles contain
+    * Makefile Names:       How to name your makefile
+    * Include:              How one makefile can use another makefile
+    * MAKEFILES Variable:   The environment can specify extra makefiles
+    * Remaking Makefiles:   How makefiles get remade
+    * Overriding Makefiles: How to override part of one makefile with another makefile
+    * Reading Makefiles:    How makefiles are parsed
+    * Secondary Expansion:  How and when secondary expansion is performed
+
+3.1 makefile包含什么(What Makefiles Contain)
+    makefile包含五类东西:显式规则(explicit rules)，隐式规则(implicit rules)，变量定义(variable definitions)，指令(directives)
+和注释(comments)。规则，变量和指令在后面章节讲述。
+    * 显式规则说明了何时和怎样重新制作一个或多个被称为target的文件。它列出了target依赖的其他文件，被称为target的prerequisite，
+和也许也会给一个recipe来创建或者更新target。see Writing Rules
+    * 隐式规则说明了何时和怎样重新制作基于他们名字的一类文件。它描述了target怎样依赖一个和target名字相似的文件，给一个recipe来
+创建或者更新那样的target。see Using Implicit Rules
+    * 变量定义是指定文本字符串的值到一个变量，该变量后面会被替换为文本。简单的makefile例子说明了objects变量的定义。see Varial-
+be Make Makefiles Simpler
+    * 指令是让make读makefile时做一些特定事情的指令。这些包括:
+        # 读另一个makefile(see Including Other Makefiles)
+        # (依据变量的值)决定是否使用或者忽略makefile的部分。(see Conditional Parts of Makefiles)
+        # 定义一个包含多行的字符串(see Defining Multi-Line Variables)
+    * 注释以'#'开始。它和改行的其他部分被忽略，除非是不经过转移的尾部反斜线将会继续注释跨越多行。包含注释的行是空白的，会被忽略
+。如果你想要字面值#，使用反斜线转移(例如\#)。注释会出现在makefile的任何行，尽管他们在某些情况下被特殊对待。
+    你不能在变量引用或者函数调用中使用变量:在变量引用或者函数调用中#被作为字面值。
+    在recipe中的注释被传递到shell，仅作为任何其他的recipe的文本。shell决定如何解释它:这是否是注释依据shell。
+    在define指令内，在变量定义期间注释不被忽略，而是在变量值中保持不变。当变量被扩展时，被对待为make的注释还是recipe文本，依据
+变量被计算的上下文。
+
+3.1.1 拆分长行(Splitting Long Lines)
+    makefile使用基于行的语法，换行符是特殊的和标记了声明的结尾。GNU make对声明长度没有限制，上限为你电脑的内存数量。
+    然而，如果行太长，在没有滚屏的时候读起来是困难的。因此，你能通过增加换行符到声明的中间来格式化makefile来增加可读性。使用反
+斜线(\)可以做到这一点。Where we need to make a distinction we will refer to "physical lines" as a single line ending with a n-
+ewline(regardless of whether it is escaped) and a "logical line" being a complete statement including all escaped newlines up 
+to the first non-escaped newline.
+    反斜线/换行符组合被处理的方式依赖声明是否是recipe行或者不是recipe行。在recipe中反斜线/换行符的处理稍候被讨论。(see Splitt-
+ing Recipe Lines)
+    Outside of recipe lines, backslash/newlines are converted into a single space character. Once that is done, all whitspace
+around the backslash/newline is condensed a single space: this includes all whitespace preceding backslash, all whitespace at
+the beginning of the line after the backslash/newline, and any consecutive backslash/newline combinations.
+    If the .POSIX special target is defined then backslash/newline handling is modified slightly to conform to POSIX.2: first,
+whitespace preceding a backslash is not removed and second, consecutive backslash/newlines are not condensed.
+
+3.2 给makefile取名字(What Name to Give Your Makefile)
+    默认情况下，当make寻找makefile名字时，它尝试如下顺序，GNUmakefile, makefile和Makefile。
+    正常情况下，你应该将你的makefile取名为makefile或者Makefile。(我们推荐Makefile因为它醒目的出现在目录列表的开始部分，另一个
+重要的文件，例如README)。第一个名字GNUmakefile，不被推荐为了大多数makefile。如果你有一个特别针对GNU make的makefile，你可以使用
+这个名字，和不会被其他make版本理解。其他的make程序寻找makefile和Makefile,而不是GNUmakefile。
+    如果make没有找到这些文件，它不会使用任何makefile。那么你必须使用命令参数来指定一个goal，make将会尝试使用内建的隐式规则来查
+处怎么重新制作它。see Using Implicit Rules.
+    如果你想使用makefile的非标准名字，你能使用'-f'或者'--file'选项来指定makefile的名字。参数'-f name'或者'--file=name'告诉make
+读name作为makefile。如果你使用多个'-f'或者'--file'选项，你能指定多个makefile。所有的makefile以特定的顺序被组织。如果你指定了'-
+f'或者'--file'，默认的makefile名字不会被自动检查。
+
+3.3 包含其他makefile(Including Other Makefiles)
+    include指令告诉make暂停读当前makefile且在继续之前读一个或多个其他的makefile。在makefile里该指令看起来如下:
+        include filenames...
+    filenames能包含shell文件名字格式。如果filenames是空的，什么也不被包含且没有错误。
+    在行开始额外的空格被允许且被忽略，但是第一个字符不准是tab(或者.RECIPEPREFIX的值)。如果行开始是tab，它将被认为是recipe行。
+在include和其他文件名之间空格符被需要。额外的空格符被忽略。在行尾以'#'开始的注释被允许。如果文件名包含任何变量或者函数引用，他
+们会被扩展。see How to Use Variables.
+    例如，如果你有三个.mk文件，a.mk， b.mk和c.mk和$(bar)扩展了bish bash，那么下面的表达式
+        include foo *.mk $(bar)
+    等价于
+        include foo a.mk b.mk c.mk bish bash
+    当make处理include指令时，它暂定读正在包含的makefile且轮流读取每个被列的文件。当完成后，make重新开始读取指令开始的makefile。
+    使用include指令的场合是当在几个目录下被单独的makefile处理的几个程序需要使用一组公共的变量定义集合(see Setting Variables)或
+者模式规则(see Defining and Redefining Pattern Rules)。
+    另一种场合是当你想自动的从源文件中生成prerequisite。prerequisite被放在被主makefile包含的文件里。This practice is generally
+clear than that of somehow appending the prerequisites to the end of the main makefile as has been traditionally done with ot-
+her versions of make. see Automatic Prerequisites.
+    如果指定的名字不是以正斜线打头，或者文件在当前目录下没有被发现，几个其他的目录将会被查找。首先，你使用'-I'或者'--include-d
+ir'选项指定的任何目录(see Summary of Options)。随后如下目录被查找，顺序如下:prefix/include(正常情况下，/usr/local/include)
+/usr/gnu/include，/usr/local/include，/usr/include。
+    如果被包含的makefile文件在这些目录中没有被发现，警告信息会被生成，但是不是一个立即的致命错误，包含include的makefile的处理
+继续。一旦完成了读makefile，make将尝试着重新make所有过期的或者是不存在的。see How Makefiles Are Remade。只有在它尝试发现一个re
+make makefile的方法且失败后，make将会将缺失的makefile作为一个致命错误。
+    如果你想让make简单的忽略makefile不存在或者不被重新remade，在没有出错的情况下，使用-include指令来代替include，像这样:
+        -include filenames...
+    为了兼容一些其他的make实现，sinclude是-include的另一个名字。
+
+3.4 变量MAKEFILES(The Variable MAKEFILES)
+    如果环境变量MAKEFILES被定义，make将它的值作为额外makefile名字的列表来读在其他的之前。工作起来像include指令:各种目录为这些
+文件被搜查。(Including Ohter Makefiles)。此外，默认的goal从来不来自这些makefile。且如果被列在MAKEFILES里的文件没有被发现，不会
+报错。
+    MAKEFILES的主要用途是在make的递归调用之间交流。(see Recursive Use of make)。通常情况下，在顶级的make调用之前设置环境变量是
+不好的，因为不招惹外面来的makefile通常是更好的。然而，如果你运行make没有指定的makefile，在MAKEFILES中的makefile做有用的事情来
+帮助内建的隐式规则工作的更好，例如定义搜索路径。(see Directory Search)
+    一些用户尝试在登录的时候自动设置MAKEFILES到环境中，且处理makefile。这是一个非常糟糕的主意，因为那样的makefile被其他人执行
+时将不会工作。使用显式include指令是更好的。see Including Other Makefiles
+
+3.5 makefile怎样被重建(How Makefiles Are Remade)
+    有时，makefile从其他文件中被重建，例如RCS或者SCCS文件。如果makefile能从其他文件中重建，你可能想让make得到一个实时更新的ma-
+kefile版本。
+    为此目的，在读完所有的makefile之后，make考虑每个作为一个goal且尝试更新它。如果makefile有一个规则，说明怎样更新它(在makefi-
+le中被发现或者在另一个)或者如果隐式规则应用了它(see Using Implicit Rules)，如果必要的话，将会被更新。在所有的makefile被更新之
+后，如果有一些被改变了，make再读一遍所有的makefile。(它将再尝试更新他们中的每一个，但是正常情况下，这将不会再改变它们，因为它
+们已经是更新的了)
+    如果你知道你的makefile中的一个或者多个不能被重建且你想让make执行隐式规则查找它们，也许为了效率的原因，你能使用任何正常的方
+法来阻止隐式规则向上查找。例如，你能写一个显示的规则作为target，和一个空的recipe(Using Empty Recipes)
+    如果makefile指定一个双冒号规则来重建带有recipe但是没有prerequisite的文件，那个文件总是被重建(see Double-Colon)。在这种make
+file中，有带有recipe但是没有prerequisite的双冒号规则的的makefile每次make执行时都会被重建，且在make开始和再次读makefile时又被重
+建。这将引起一个无限循环:make不断的重建makefile且从来不做任何其他事情。因此，为了避免这种现象，make不会尝试重建被指定作为targe
+t，该target带有一个recipe但是没有prerequisite的双冒号规则。
+    如果你没有使用'-f'或者'--file'选项指定任何makefile，make将尝试默认的makefile名字。see What Name to Give Your Makefile。不
+像使用'-f'或者'--file'选项显式请求的makefile，make不确定makefile是否存在。然而，如果默认的makefile不存在但是可以通过运行make规
+则来创建，你可能想让规则被运行以至于makefile被使用。
+    因此，如果默认的makefile不存在，make将尝试以他们被查找的顺序make它们。(see What Name to Give Your Makefile)直到成功或者失
+败。注意如果make不能发现或者make任何makefile，这不是错误。makefile不总是必要的。
+    当你使用'-t'或者'--touch'选项(see Instead of Executing Recipes)时，你不想使用一个过期的makefile来决定那个target被touch。因
+此'-t'选项对更新makefile没有影响。即使'-t'被指定他们也会被更新。同样的，'-q'('--question')和'-n'('--just-print')不会阻止更新ma
+kefile，因为过期的makefile导致其他target错误的输出。因此'make -f mfile -n foo'将会更新mfile，读入，随后打印recipe来更新foo和它
+的prerequisite在不运行它的情况下。为foo打印的recipe将是在mfile被更新的内容中指定的那个。
+    然而，在你可能希望阻止更新makefile的场合。你能通过在命令行里指定makefile作为goal也可以指定他们作为makefile来做这个。当make
+file显式被指定为goal时，'-t'等将会应用他们。
+    因此'make -f mfile -n mfile foo'将会读makefile mfile，打印需要被更新实际没有运行它的recipe且随后打印需要更新foo但是不运行
+它的recipe。为了foo的recipe将是被mfile存在的内容指定的那个。
+
+3.6 覆盖另一个makefile的部分(Overriding Part of Another Makefile)
+    有时有一个makefile(它的大部分像另一个makefile)是有用的。你能使用'include'指令来在另一个里面包含一个，和增加更多的target或
+者变量定义。然而，两个makefile为了同一个target有不同的recipe是无效的。但是有另一种方式。
+    在正在包含makefile的文件中，你能使用匹配任何东西的模式规则来表明remake任何target(该target使用来在正在包含的makefile中的信
+息不能被make)，make应该看另一个makefile。see Pattern Rules.
+    例如，如果你有一个makefile(Makefile)说明怎样make target 'foo'(和另一个target)，你能写一个makefile(GNUmakefile)包含:
+        foo:
+            frobnicate > foo
+        %: force
+            @$(MAKE) -f Makefile $@
+        force: ;
+    如果你执行'make foo'，make将会发现GNUmakefile，读它，且看那个来make foo，他需要运行recipe 'frobnicate > foo'。如果你执行'
+make bar'，make发现在GNUmakefile中没有方法来make bar，因此它将会使用来自模式规则的recipe:'make -f Makefile bar'。如果Makefile
+提供了更新bar的规则，make将应用该规则。对任何GNUmakefile没有说怎样make的target都一样。
+    这种工作的方式是模式规则有一个%模式，因此它匹配任何target。该规则制定了一个prerequisite force，来保证recipe会被运行即使ta
+rget文件已经存在。我们给force规则一个空的recipe来阻止make寻找隐式规则来建立它。不然，它将应用同样的匹配任何的规则来force自身，
+创建一个prerequisite循环。
+
+3.7 make怎样读Makefile(How make Reads a Makefile)
+    GNU make以另个不同的阶段工作。在第一个阶段，它读所有的makefile，被包含的makefile等，将所有变量转化为值，隐式和显式规则，和
+构建一个所有target和prerequisite依赖关系图。在第二个阶段，make使用这些内部结构来决定哪些target需要被重建和调用必要的规则来做那
+个。
+    理解这两个阶段的过程是重要的，因为它直接影响变量和函数扩展是怎么处理的。这通常是写makefile时困惑的源泉。在这我们将为在make
+file内不同构造扩展发生的阶段做个总结。我们说如果它发生在第一个阶段，那么扩展是立即的。在这种情况下，make将扩展任何变量或者函数
+在makefile被解析。如果扩展没有立即执行，我们说扩展是延时的。一个延时的构造的扩展直到构造稍候出现在立即上下文或者直到第二阶段才
+被执行。
+    你可能还不熟悉这些构造器。当你在后面的章节熟悉他们的时候，你可以引用本章。
+
+变量赋值(Variable Assignment)
+    变量定义被解析如下：
+        immediate = deferred
+        immediate ?= deferred
+        immediate := immediate
+        immediate ::= immediate
+        immediate += defferd or immediate
+        immediate != immediate
+        
+        define immediate
+            defferred
+        endef
+        define immediate =
+            deferred
+        endef
+        define immediate ?=
+            deferred
+        endef
+        define immediate :=
+            immediate
+        endef
+        define immediate ::=
+            immediate
+        endef
+        define immediate +=
+            defferred or immediate
+        endef
+        define immediate !=
+            immediate
+        endef
+    对于追加操作'+='，如果变量之前被设置为单变量(':='或者'::=')那么右边的被认为是immediate，否则是deferred。
+    对于shell赋值操作'!='，右边的立即被执行且被交给shell。结果被存在左边的变量中，变量变成一个简单的变量(因此在每次引用时被重
+新计算)
+
+条件指令(Conditional Directives)
+    条件指令立即被解析。例如，这意味着自动变量不能在条件指令中被使用，因为直到那个规则的recipe被调用自动变量还未被设置。如果你
+需要在条件指令中使用自动变量，你必须将条件移到recipe中且使用shell的条件语法。
+
+规则定义(Rule Definition)
+    规则总是被同样的方式扩展，除了如下形式:
+        immediate: immediate; deferred
+            deferred
+    即，目标和prerequisite被立即扩展，且被用来构造target的recipe总是deferred。一般的规则对于显式规则，模式规则，后缀规则，静态
+匹配规则和简单的prerequisite定义是真的。
+
+3.8 第二次扩展(Secondary Expansion)
+    在之前的章节中，我们已经了解到GNU make工作在两个阶段:一个读入阶段和一个目标更新阶段(see How make Reads a Makefile)。GNU ma
+ke也有能力为makefile中的一些或者所有target的prerequisite做第二次扩展。为了第二次扩展，特殊的target .SECONDEXPANSION必须被定义
+在利用该功能的第一个prerequisite之前。
+    如果特殊的target被定义在以上提到的两个阶段之间，读阶段结束的右边，在特殊的target之后的所有target的prerequisite被第二次扩展。
+
+显式规则的第二次扩展(Secondary Expansion of Explicit Rules)
+静态模式规则的第二次扩展(Secondary Expansion of Static Pattern Rules)
+隐式规则的第二次扩展(Secondary Expansion of Implicit Rules)  
