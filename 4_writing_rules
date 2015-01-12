@@ -1,0 +1,96 @@
+4 写规则(Writing Rules)
+    rule出现在makefile中和说明了何时和怎样remake某些文件，称为rule的target。(大多数一个rule一个target)。它列出了其他的文件，这
+些文件是target的prereuqisite，和用来创建和更新target的recipe。
+    rule的顺序是不重要的，除了决定默认的goal:make认为的target，如果你没有指定它。默认的goal是第一个makefile中的第一个rule的tar
+get。如果第一个rule有多个target，仅有第一个target被认为是默认的。有两个意外情况:以句号开头的target不是默认的除非它包含了一个或
+多个正斜线'/'。定义模式规则的target不影响默认的goal。(see Defining and Redefining Pattern Rules)
+    因此，我们通常写makefile以至于第一个rule是编译整个程序或者被makefile描述的所有程序的(通常target被称为all)。see Arguments t
+o Specify the Goals。
+    * Rule Example:             使用一个例子来解释 
+    * Rule Syntax:              解释一般格式
+    * Prerequisite Types:       有两种类型的prerequisite
+    * Wildcards:                使用通配符例如'*'
+    * Directory Search:         查找其他目录为了源文件
+    * Phony Targets:            使用不是一个真实文件名的target
+    * Force Targets:            在没有recipe或者prerequisite的情况下使用target来标记其他的target为phony
+    * Empty Targets:            只有日期重要和文件是空的情况
+    * Special Targets:          特殊内建意义的target
+    * Multiple Targets:         在规则中利用几个target
+    * Multiple Rules:           在同一个target上怎样使用多个rule
+    * Static Pattern:           静态rule应用到多个target且依据target名字改变prerequisite
+    * Double-Colon:             怎样使用特殊类型的rule来允许几个独立的rule为了一个target
+    * Automatic Prerequisites:  通过来自源文件自身怎样自动生成rule
+
+4.1 规则例子(Rule Example)
+    这是一个rule的例子:
+        foo.o : foo.c defs.h
+            cc -c -g foo.c
+    target是foo.o和prerequisite是foo.c和defs.h。在recipe中有一个命令:'cc -c -g foo.c'。recipe以tab开始为了标识它是一个recipe。
+    该rule说明了两件事情:
+        * 怎样决定foo.o是否过期:如果它不存在或者如果foo.c或者defs.h比它更新，那么它是过期的
+        * 怎样更新文件foo.o:通过运行cc。recipe没有显式的提到defs.h，但是我们假定foo.c包含它，且那是defs.h被加入到prerequisite
+的原因。
+
+4.2 规则语法(Rule Syntax)
+    通常情况下，rule看起来像这样:
+        targets: prerequisites
+            recipe
+            ...
+    或者像这样:
+        targets: prerequisites; recipe
+            recipe
+            ...
+    targets是文件名。通配符可能会被使用(see Using Wildcard Characters in File Names)和a(m)形式的名字表明成员m在打包文件a中(see
+Archive Members as Targets)。通常情况下，一个rule仅有一个target，但是偶尔有多个(see Multiple Targets in a Rule)
+    recipe行以tab开头，(或者在.RECIPEPREFIX变量中值的第一个字符， see Special Variables)。第一个recipe行可能出现在prerequisite
+后，带有一个tab，或者出现在同一个行，带有一个分号。无论那种方式，效果是一样的。在recipe的语法上有其他的不同。see Writing Recip
+es in Rules。
+    因为$被用来开始make变量引用，如果你真的想在target或者prerequisite中有$，你必须写两个，'$$'(see How to Use Variables)。如果
+你使用了第二次扩展(see Seconday Expansion)且你想在prerequisite列表中有一个$，你要写四个$('$$$$')。
+    你可能会通过插入一个反斜线加换行符分割一个长行。但是那是不必的，因为make对makefile中行的长度没有限制。
+    该rule告诉make两件事情:target何时过期和当必要时怎样更新他们。
+    过期的标准使用prerequisite指定。(通配符和归档成员(see Archives)在这也被允许)。如果它不存在或者它必prerequisite旧(通过比较
+最后修改时间)，那么target是过期的。target文件的内容基于prerequisite的信息被计算，因此，如果prerequisite中的任何改变，已经存在
+的target的内容不再有效。
+    如何更新是被recipe指定的。这是被shell执行的一行或者多行，但是有一些额外的功能(see Writing Recipes in Rules)。
+
+4.3 prerequisite的类型(Types of Prerequisites)
+    事实上，有两种不同类型的prerequisite可以被GNU make理解:正常的prerequisite，例如之前章节中描述的和order-only的prerequisite。
+一个正常的prerequisite有两个声明:首先，它规定了recipe被调用的顺序:在target的recipe运行之前target的所有的prerequisite的recipe被
+完成。第二，它规定了依赖关系:如果任何prerequisite比target更新，那么target被认为是过期的且必须被重建。
+    正常情况下，这就是你想要的:如果target的prerequisite被更新，那么target也应该被更新。
+    然而，偶尔，你有一个情境:你想规定一个规则被调用的特定的顺序在不强制target被更新的情况下，如果这些规则被执行。在那种情况下
+，你想定义order-only prerequisite。order-only prerequisite通过在prerequisite列表中放一个管道符(|)来指定:管道符左边的任何prere
+quisite是正常的，右边的是order-only:
+        targets: normal-prerequisites | order-only-prerequisites
+    当然，正常的prerequisite可能是空的。你也可以为同一个target声明多行prerequisite:它们适当的被追加(正常的prerequisite被追加在
+正常的prerequisite列表中，order-only prerequisite被追加在order-only prerequisite列表中)。注意如果你在正常的和order-only prereq
+uisite中声明了同样的文件，正常的prerequisite优先。
+    考虑如下例子:你的target被放在单独的目录下，且在make运行之前那个目录可能不存在。在这种情况下，你想在任何target被放入之前目
+录被创建，由于当文件被增加，删除或者重命名时，目录的时间戳改变了，我们真的不想在目录时间戳改变时重建所有的target。管理这个的一
+种方法是order-only prerequisite:让目录成为所有target的order-only prerequisite。
+        OBJDIR := objdir
+        OBJS := $(addprefix $(OBJDIR)/, foo.o bar.o baz.o)
+        $(OBJDIR)/%.o: %.c
+            $(COMPILE.c) $(OUTPUT_OPTION) $<
+        all: $(OBJS)
+        $(OBJS): | $(OBJDIR)
+        $(OBJDIR):
+            mkdir $(OBJDIR)
+    现在如果必要，在任何'.o'被创建之前，创建objdir目录的规则将被执行，但是没有'.o'被重建由于objdir目录时间戳改变。
+
+4.4 在文件名中使用通配符(Using Wildcard Characters in File Names)
+    通过使用通配符单一的文件名可以指很多文件。make中的通配符是'*'，'?'和'[...]'，和在shell中的一样。例如，*.c指定了名字以'.c'
+结尾的所有文件的列表。
+    文件名开头的字符'~'也有特殊的意义。如果单独的，或者被正斜线跟着。它代表你的home目录。例如~/bin扩展为/home/you/bin。如果'~'
+被一个词跟着，字符串代表被那个词指定的用户的home目录。例如~john/bin展开为/home/john/bin。在没有home目录的系统上，通过设置环境
+变量HOME来模拟。
+    在target或者prequisite中的通配符表达式被make自动执行。在recipe里，shell负责通配符表达式，在其他的上下文中，通配符表达式仅
+发生在你显式的使用通配符函数请求它。
+    通配符的特殊意义通过使用反斜线被关闭。因此foo\*bar将指向一个特定的文件，该文件的名字由'foo',星号和'bar'组成。
+    * Wildcard Examples: 几个例子
+    * Wildcard Pitfall:  避免的问题
+    * Wildcard Function: 在通配符不能正常使用的地方怎样扩展通配符。
+
+4.4.1 通配符例子(Wildcard Examples)
+    
