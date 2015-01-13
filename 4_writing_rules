@@ -85,12 +85,282 @@ uisite中声明了同样的文件，正常的prerequisite优先。
     文件名开头的字符'~'也有特殊的意义。如果单独的，或者被正斜线跟着。它代表你的home目录。例如~/bin扩展为/home/you/bin。如果'~'
 被一个词跟着，字符串代表被那个词指定的用户的home目录。例如~john/bin展开为/home/john/bin。在没有home目录的系统上，通过设置环境
 变量HOME来模拟。
-    在target或者prequisite中的通配符表达式被make自动执行。在recipe里，shell负责通配符表达式，在其他的上下文中，通配符表达式仅
-发生在你显式的使用通配符函数请求它。
+    在target或者prequisite中的通配符扩展被make自动执行。在recipe里，shell负责通配符扩展，在其他的上下文中，通配符扩展仅发生在
+你显式的使用通配符函数请求它。
     通配符的特殊意义通过使用反斜线被关闭。因此foo\*bar将指向一个特定的文件，该文件的名字由'foo',星号和'bar'组成。
     * Wildcard Examples: 几个例子
     * Wildcard Pitfall:  避免的问题
     * Wildcard Function: 在通配符不能正常使用的地方怎样扩展通配符。
 
 4.4.1 通配符例子(Wildcard Examples)
+    通配符能用在recipe的rule的recipe中，他们被shell扩展。例如，这有一个删除所有对象文件的规则:
+        clean:
+            rm -rf *.o
+    通配符在rule的prerequisite中也是有用的。在有下列规则的makefile中，'make print'将打印所有自从上次打印之后改变过的'.c'文件。
+        print: *.c
+            lpr -p $?
+            touch print
+    该规则使用print作为空的target文件。see Empty Target Files to Record Events。(自动变量'$?'被用来打印已经改变的那些文件。see
+Automatic Variables)
+    当你定义变量时，通配符扩展不会发生。因此，如果你写这个:
+        objects = *.o
+    那么变量objects的值是实际的字符串'*.o'。然而，然而如果你在target或者prerequisite中使用objects的值，通配符扩展在此处发生。
+如果你在recipe中使用objects的值，当recipe执行时，shell可能会执行通配符扩展。为了设置object扩展，代替使用:
+        objects := $(wildcard *.o)
+
+4.4.2 使用通配符易犯的错误(Pitfalls of Using Wildcards)
+    现在有一个以幼稚的方式使用通配符的例子，那不会做你想的事情。假设你想说明:可执行文件foo由目录里的所有对象文件生成，且你写:
+        objects = *.o
+        foo: $(objects)
+            cc -o foo $(CFLAGS) $(objects)
+    objects的值是真正的字符串'*.o'。通配符扩展发生在foo的规则中，因此每个存在的'.o'文件变成了foo的prerequisite且如果必要被重新
+编译。
+    但是如果你删除所有的'.o'文件时发生什么呢？当通配符没有匹配任何文件时，什么都不做，因此foo将依赖古怪的文件*.o。由于没有那样
+的文件存在，make将给你一个错误信息说明:它不知道怎样make *.o。这不是你想要的。
+    实际上通过通配符扩展获得期望的结果是可能的，但是你需要更复杂的技术，包含通配符函数和字符串替换。see The Function wildcard。
+    Microsoft操作系统(MS-DOS and MS-Windows)使用反斜线来分隔目录，像这样:
+        c:\foo\bar\baz.c
+    这等价于Unix风格c:/foo/bar/baz.c(c:部分是所谓的驱动器字母)。当make运行在这些系统上时，它支持反斜线就像Unix风格的正斜线一样
+。然而，该支持不包含通配符扩展，反斜线是引号字符。因此，在这些情况下，你必须使用Unix风格的正斜线。
+
+
+4.4.3 函数wildcard(The Function wildcard)
+    在规则中通配符扩展自动发生。但是通配符扩展在变量设置或者函数参数内时不会自动发生。如果你想在那些地方做通配符扩展，你需要使
+用wildcard函数，像这样:
+        $(wildcard pattern...)
+    在makefile中的任何地方，字符串被匹配给定文件名模式之一的存在的文件名以空格分隔的列表替换。如果没有存在的文件名匹配模式，那
+么模式被wildcard函数的输出忽略。注意这和在规则中不匹配通配符的行为是不同的，它们被使用而不是被忽略(see Wildcard Pitfall)。
+    wildcard函数的一个用途是得到目录里C源文件的列表，想这样:
+        $(wildcard *.c)
+    我们可以改变C源文件的列表到对象的列表，通过替换结果中的'.c'到'.o'，像这样:
+        $(patsubst %.c, %.o, $(wildcard *.c))
+    (我们在这使用了另一个函数，patsubst。see Functions for String Substitution and Analysis)
+    因此，编译目录下的所有C源文件和随后将他们链接到一起的makefile被写如下:
+        objects := $(patsubst %.c, %.o $(wildcard *.c))
+        foo: $(objects)
+            cc -o foo $(objects)
+    (这利用了隐式规则编译C程序，因此没有必要写显式规则编译文件。see The Two Flavors of Variables，':='的扩展，'='的变体)
+
+4.5 为prerequisite查找目录(Searching Directories for Prerequisites)
+    对于大型系统，将源文件和二进制文件放在单独的目录里是更好的。make的目录查找功能通过自动的查找几个目录来发现prerequisite使这
+个更容易。当你重新发布目录中的文件时，你不必改变个别的规则，只改变搜索路径。
+    * General Search:    制定一个应用到每个prerequisite的查找路径
+    * Selective Search:  为特定类的文件指定查找路径
+    * Search Algorithm:  查找路径何时和怎样被应用
+    * Recipes/Search:    如何写recipe，使其和查找路径一起工作
+    * Implicit/Search:   怎样查找路径影响隐式规则
+    * Libraries/Search:  目录查找为了链接库
+
+4.5.1 VPATH:为所有的prerequisite查找路径(VPATH: Search Path for All Prerequisites)
+    make变量VPATH的值制定了一系列make应该查找的目录。大多数情况下，目录被期望包含不在当前目录下的prerequisite文件。然而，make
+使用VPATH作为查找列表即为了prerequisite也为了rule的target。
+    因此，如果被列为target或者prerequisite的文件在当前目录下不存在，make将使用那个名字查找列在VPATH里的目录。如果文件被发现，
+该文件可能会变成prerequisite。随后rule将在prerequisite列表中指定文件名就像他们存在于当前目录一样。see Writing Recipes with 
+Directory Search
+    在VPATH变量中，目录被冒号或者空格分隔。目录的顺序就是make查找的顺序。
+    例如，
+        VPATH = src:../headers
+    指定了包含两个目录的路径，src和../headers，make查找的顺序。
+    带有VPATH的值，下列规则:
+        foo.o: foo.c
+    被解释就像如下:
+        foo.o: src/foo.c
+    假设foo.c不存在于当前目录而是在src目录。
+
+4.5.2 vpath目录(The vpath Directive)
+    和VPATH变量相似，但是更有选择性，是vpath目录，允许你为特定类的文件名(匹配特定模式的)指定查找路径。因此，你能使用某一查找目
+录为一类文件名和其他目录为了另一个文件名。
+    有三种形式的vpath目录:
+    vpath pattern directories
+        为匹配模式的文件名指定查找路径directories
+        查找路径directories是将要被查找的以冒号或者空格分隔的路径列表，就像在VPATH中使用的查找路径一样。
+    vpath pattern
+        清除和pattern相关的查找路径
+    vpath
+        清除之前被vpath目录指定的所有查找路径
+    vpath模式是包含'%'字符的字符串。字符串匹配正在被查找的prerequisite的文件名，'%'字符匹配0个或多个字符序列(按照模式规则，see
+Defining and Redefining Pattern Rules)。例如，%.h匹配以.h结尾的文件。(如果没有'%'，模式将精确匹配prerequisite，这通常是没用的)
+    '%' characters in a vpath directive's pattern can be quoted with preceding backslashes('\'). Backslashes that would other-
+wise quote '%' characters can be quoted with more backslashes. Backslashes that quote '%' characters or other backslashes are 
+removed from the pattern before it is compared to file names. Backslashes that are not in danger of quoting '%' characters go
+unmolested.
+    当prerequiste在当前目录下不存在时，如果在path中的pattern匹配了prerequisite文件，那么在那个指令下的directories被查找就像在
+VPATH变量中的目录一样。
+    例如，
+        vpath %.h ../headers
+    告诉make查找目录../headers下以.h结尾的任何prerequisite如果文件没有在当前目录下发现。
+    如果几个vpath模式匹配了prerequisite文件名，那么make一个接一个的处理每个匹配的vpath，查找在每个指令下被提到的所有目录。make
+按照出现在makefile中的顺序处理多个vpath目录。带有同一模式的多个目录是相互独立的。
+    因此，
+        vpath %.c foo
+        vpath %   blish
+        vpath %.c bar
+    将会在foo里寻找以'.c'结尾的文件，随后blish，随后bar，然而
+        vpath %.c foo:bar
+        vpath %   blish
+    将会在foo里寻找以'.c'结尾的文件，随后bar，随后blish。
+
+4.5.3 目录查找怎样被执行(How Directory Searches are Performed)
+    当prerequisite通过目录查找被发现时，忽略类型(general or selective)，路径名称可能不是在prerequisite中make真正提供给你的那个
+。有时，通过目录查找被发现的路径将被扔掉。
+    make决定是否保持或者放弃通过目录查找发现的路径的算法如下:
+        1. 如果target文件在指定的makefile中不存在，目录查找被执行。
+        2. 如果目录查找成功了，该路径被保留且该文件尝试性的被存储为target
+        3. 该target的所有prerequisite使用同样的方法被检查。
+        4. 在处理完prerequisite后，target可能也可能不需要被重建:
+            1. 如果target不需要被重建，在目录查找过程中发现的文件路径被用作包含这个target的所有prerequisite列表。简而言之，如
+果make不需要重建target，你使用通过目录查找发现的路径
+            2. 如果target需要被重建(过期了)，在目录查找期间发现的路径名称被丢弃，且target使用在makefile中指定的文件名重建。简
+而言之，如果make必须重建，那么target在本地被重建，不是在通过目录查找发现的目录里。
+    算法看起来好像有点复杂，但是实际上是你真正想要的。
+    其他版本的make使用一个更简单的算法:如果文件不存在且通过目录查找被发现，那么无论target是否需要被重建，路径名称总是被用。因
+此，如果target被重建，它被创建在目录查找期间被发现的路径名称里。
+    事实上，如果这是你想要的行为，你能使用GPATH变量来表明这个给make。
+    GPATH和VPATH有一样的语法和格式。如果过期的target在目录查找被发现且那个目录也在GPATH变量中，那么路径名称不被丢弃。target使
+用扩展的路径重建。
+
+4.5.4 使用目录查找写recipe(Writing Recipes with Directory Search)
+    当prerequisite通过目录查找在另一个目录里被发现时，这不能改变rule的recipe。它们按照写入的执行。因此，你必须小心的写recipe，
+以至于它会在make发现它的文件夹里寻找prerequisite。
+    这可以通过自动变量来完成。例如'$^'(see Automatic Variables)。因此，'$^'的值是规则的所有prerequisite的列表，包含他们被发现
+的目录的名称，和'$@'的值是target。因此:
+        foo.o: foo.c
+            cc -c $(CFLAGS) $^ -o $@
+    (变量CFLAGS存在，因此你能通过隐式规则为C编译指定标记，我们在这使用它为了一致性，因此它一致的影响所有的C编译。see Variables
+Used by Implicit Rules)
+    prerequisite通常也包含头文件，且你不想在recipe中包含。自动变量'$<'仅代表第一个prerequisite:
+        VPATH = src:../headers
+        foo.o: foo.c defs.h back.h
+            cc -c $(CFLAGS) $< -o $@
+
+4.5.5 目录查找和隐式规则(Directory Search and Implicit Rules)
+    通过被VPATH或者vpath指定的目录查找在隐式规则期间会发生。(see Using Implicit Rules)
+    例如，当文件foo.o没有显式规则，make考虑隐式规则，例如内建规则来编译foo.c如果该文件存在。如果该文件在当前目录下缺失，适当的
+目录将被查找。如果foo.c存在与任何目录中，C编译的隐式规则被应用。
+    隐式规则的recipe正常情况下必要时使用自动变量。因此他们能使用通过目录查找被发现的文件且无任何影响。
+
+4.5.6 链接库中目录查找(Directory Search for Link Libraries)
+    目录查找以一种特殊的方式应用到被链接器使用的库上。当你写prerequisite，它的名字有如下形式'-lname'时，这种特殊功能被使用。(
+你可能发现了一些奇怪的事情。因为正常情况下prerequisite是一个文件名，且库的文件名通常看起来应该是libname.a，而不是'-lname')
+    当prerequisite名字有'-lname'形式时，make通过查找文件libname.so来特殊的处理它，且如果在当前目录下文件libname.a没有被发现，
+通过匹配vpath查找路径和VPATH查找路径指定的目录，随后/lib，/usr/lib，/prefix/lib目录(正常情况下/usr/local/lib)
+    例如，如果在你的系统上有/usr/lib/libcurses.a库，那么
+        foo: foo.c -lcurses
+            cc $^ -o $@
+    将会引起命令'cc foo.c /usr/lib/libcurses.a -o foo'被执行，当foo比foo.c或者/usr/lib/libcurses.a旧时。
+    尽管将要被查找的默认集合是libname.so和libname.a，这可以通过.LIBPATTERNS变量定制。该变量中的每个词是一个模式字符串。当像'-l
+name'的prerequisite被发现时，make将会使用name来替换掉模式字符串，且使用每个库文件名执行以上目录查找。
+    .LIBPATTERN的默认值是'lib%.so lib%.a'，提供了以上描述的默认行为。
+    你可以通过设置该变量为空值来关闭库链接扩展。
+
+4.6 假target(_Phony Targets)
+    假的target是没有真正的文件名的。它仅是一个将要被执行的recipe的名字当你执行一个显式请求时。有两个原因使用假的target:一个是
+为了避免同名文件的冲突，另一个是为了提高性能。
+    如果你写一个rule，它的recipe不创建target文件，每次tatget提出被remake时，recipe将被执行。这是一个例子:
+        clean:
+            rm *.o temp
+    因为rm命令没有创建命名为clean的文件，可能也没有那样的文件存在。因此每次你说'make clean'时，rm命令将会被执行。
+    在这个例子中，如果在该目录中一个名叫clean的文件曾经被创建，clean target不能正确的工作。由于它没有prerequisite，clean将总是
+被认为是最新的且recipe将不会被执行。为了避免这个问题，你能显式的声明该target为假的通过让它称为特殊target .PHONY的prerequisite
+。(see Special Built-in Target Names)如下:
+        .PHONY clean
+        clean:
+            rm *.o temp
+    一旦这被做，'make clean'将会执行recipe无论是否有名为clean的文件。
+    假的target结合make的递归调用也是很有用的(see Recursive Use of make)。在这种情境下，makefile经常包含一个列出许多将要被重建
+的子目录的变量。处理这种情况最简单的方法是使用循环子目录的recipe定义一个规则，像这样:
+        SUBDIRS = foo bar baz
+        subdirs:
+            for dir in $(SUBDIRS); do \
+                $(MAKE) -C $$dir; \
+            done
+    然而，这样是有问题的。首先，通过这个规则在子make中任何错误将会被忽略，因此在一个出错的情况下，继续重建其他目录。这可以通过
+增加shell命令来注意错误和退出来克服，但是如果make以'-k'选项被调用时，它又会做那个，这是不幸的。其次，也许更重要的是，你不能充
+分利用make的能力来并行的重建target，因为仅有一个规则。
+    通过声明子目录作为.PHONY target(如果子目录明显存在你必须做这个。否则，它不会被重建)你能解决这些问题:
+        SUBDIRS = foo bar baz
+        .PHONY: subdirs $(SUBDIRS)
+        subdirs: $(SUBDIRS)
+        $(SUBDIRS):
+            $(MAKE) -C $@
+        foo: baz
+    在这我们也声明了foo子目录必须在baz子目录被完成之后才可以被重建。当尝试并行重建时，这种依赖关系非常重要。
+    在.PHONY target中隐式规则查找被忽略。这是声明target为.PHONY有助于性能的原因，尽管你不担心真实文件的存在性。
+    假的target不应该是真实target文件的prerequisite。如果它是，每次make运行更新那个文件时，它的recipe将会被运行。只要假的target
+不是真实target的prerequisite，假的target的recipe只有在假的target是特定的goal时才被执行(see Arguments to Specify the Goals)
+    假的target可以有prerequisite。当一个目录包含多个程序时，描述所有的程序在一个makefile中是最方便的。由于makefile中默认的targ
+et是第一个，制作一个all作为假的target的prerequisite是更通用的。例如:
+        all: prog1 prog2 prog3
+        .PHONY: all
+        
+        prog1: prog1.o utils.o
+            cc -o prog1 prog1.o utils.o
+        prog2: prog2.o
+            cc -o prog2 prog2.o
+        prog3: prog3.o sort.o utils.o
+            cc -o prog3 prog3.o sort.o utils.o
+    现在你可以通过'make'来重建所有三个程序，或者指定参数来重建部分('make prog1 prog3')。虚假是不会继承的:假的target的prerequi-
+site不能是它们自身，除非显式声明。
+    当一个假的target是另一个的prerequisite时，它服务作为另一个的子程序。例如，在这的'make cleanall'将会删除所有的对象文件，diff
+文件和文件program:
+        .PHONY: cleanall cleanobj cleandiff
+        cleanall: cleanobj cleandiff
+            rm program
+        cleanobj:
+            rm *.o
+        cleandiff:
+            rm *.diff
+
+4.7 没有recipe或者prerequisite的规则(Rules without Recipes or Prerequisites)
+    如果规则没有prerequisite和recipe且rule的target是不存在的文件，那么make假设无论何时rule被运行，该target已经被更新。这表明依
+赖这个的所有target总是让他们的recipe执行。
+    举例说明:
+        clean: FORCE
+            rm $(objects)
+        FORCE:
+    在这target'FORCE'满足了特定的条件，因此依赖它的target clean被强制运行recipe。'FORCE'没有什么特别的，但是那是这种情况下通常
+被使用的名字。
+    正如你看到的，使用'FORCE'和使用'.PHONY: clean'的结果是一样的。
+    使用'.PHONY'更显式且有效。然而，其他版本的make不支持'.PHONY'。因此，'FORCE'出现在许多makefile里。see Phony Target。
+
+4.8 记录时间的空target文件(Empty Target Files to Record Events)
+    空的target是假的target的变体。它被用来存储你一次一次显式请求的动作的recipe。不像假的target，这个target文件真实存在，但是文
+件内容是无关紧要的，且通常是空的。
+    空的target文件的目的是记录最后修改的时间，即规则的recipe最后被执行的时间。它那样做因为在recipe中的命令之一是touch命令来更
+新target文件。
+    空的target文件应该有一些prerequisite(否则那就没有意义了)。当你请求重建空的target时，如果任何prerequisite比target更近，那么
+recipe将被执行。换言之，如果自从你上次重建target之后prerequisite改变了。这是一个例子:
+        print: foo.c bar.c
+            lpr -p $?
+            touch print
+    根据该规则，如果自从上次'make print'之后任何源文件改变，'make print'将执行lpr命令。自动变量'$?'被用来打印已经改变的这些文
+件(see Automatic Variables)
+
+4.9 特殊内建的target名字(Special Built-in Target Names)
+    如果它们出现作为target，那么某些名字有特殊的含义。
+    .PHONY
+        特殊的target.PHONY的prerequisite被认为是假的target。当该考虑那样的target时，make将无条件的运行它的recipe，那个文件的名
+    字存在或者最后修改时间。see Phony Targets
+    .SUFFIXES
+        特殊的target .SUFFIXES的prerequisite是被用来核对suffix rule的suffixes的列表。see Old-Fashioned Suffix Rules
+    .DEFAULT
+        为.DEFAULT指定的recipe被用在任何target(该target没有rule被发现(即使是显式或者是隐式))see Last Resort。如果.DEFAULT的re-
+    cipe被指定，作为prerequisite被提到的每个文件(但是不是rule中的target)，将会有那个recipe被执行。see Implicit Rule Search Al-
+    gorithm
+    .PRECIOUS
+    .INTERMEDIATE
+    .SECONDARY
+    .SECONDEXPANSION
+    .DELETE_ON_ERROR
+    .IGNORE
+    .LOW_RESOLUTION_TIME
+    .SILENT
+    .EXPORT_ALL_VARIABLES
+    .NOTPARALLEL
+    .ONESHELL
+    .POSIX
+
+4.10 规则中的多个target(Multiple Targets in a Rule)
+    带有多个目标的规则和写多个规则，一个目标一个是等价的。同样的recipe应用到所有的target，但是效果可能不同因为你能使用'$@'将真
+实的target名字代替recipe。该规则也向所有的target贡献相同的prerequisite。
     
