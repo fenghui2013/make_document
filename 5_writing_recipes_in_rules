@@ -1,0 +1,189 @@
+5 写rule中recipe(Writing Recipes in Rules)
+    rule中的recipe由一个或多个将要被执行(按照他们出现的顺序，一次一个)的shell命令组成。典型的，执行这些命令的结果是rule的targe
+t被更新。
+    用户使用许多不同的shell程序，但是makefile中的recipe总是被/bin/sh解释除非makefile指定。see Recipe Execution
+    * Recipe Syntax:   recipe的语法功能和陷阱
+    * Echoing:         怎样控制recipe被输出的时间
+    * Execution:       recipe怎样被执行
+    * Parallel:        recipe怎样并行执行
+    * Errors:          在recipe执行出错后发生什么
+    * Interrupts:      当recipe被中断时发生什么
+    * Recursion:       从makefile中调用make
+    * Canned Recipes:  Defining canned recipes
+    * Empty Recipes:   定义有用的，但什么都不做的recipe
+
+5.1 recipe语法(_Recipe Syntax)
+    makefile有不同寻常的属性(在一个文件中有两种不同的语法)。大多数makeifle使用make语法(see Writing Makefiles)。然而，recipe被
+shell解释因此他们通过shell语法写。make程序不会尝试理解shell语法:在处理它到shell之前仅在recipe的内容上执行几个特定的转换。
+    recipe中的每行必须以tab开头(或者是.RECIPEPREFIX变量值的第一个字符，see Special Variables)，除了只有第一行可以使用分号附在
+target和prerequisite行。以tab开头且出现在rule上下文中的makefile中的任何行(即，在rule被开始直至另一个入了或者变量定义后)将被认
+为是那个rule的recipe的部分。空行和注释行出现在recipe行中间。他们将被忽略。
+    这些规则的因果关系如下:
+        * 以tab开始的空行不是空的:它是空的recipe(see Empty Recipes)
+        * recipe中的注释不是make注释；它将被传递给shell。shell是否将它作为注释依赖你的shell
+        * 在rule上下文中的变量定义被认为是recipe的一部分，不是make变量定义，且将被传递给shell
+        * 在rule上下文中的条件表达式(ifdef，ifeq等 see Syntax of Conditionals)被认为是recipe的一部分且被传递到shell
+    * Splitting Recipe Lines: 拆分长的recipe行为了可读性
+    * Variables in Recipes:   在recipe中使用make变量
+
+5.1.1 拆分recipe行(Splitting Recipe Lines)
+    make解释recipe的几种方式之一是检查新行之前是否有反斜线。在正常的makefile语法中，单独的逻辑recipe行可以被拆成多个物理行通过
+在每个新行之前添加反斜线。像这样行的序列被认为是单独的recipe行，且会调用shell来运行它。
+    然而，相比之下，在makefile中的其他地方他们怎样被对待(see splitting Long Lines)，反斜线/新行对不会从recipe中移除。反斜线和
+新行会被保存且传递给shell。反斜线/新行怎样被解释依赖你的shell。如果反斜线/新行之后的下一行的第一个字符是recipe的前缀字符(默认
+是tab)，那么该字符被删除。空格从来不会被增加到recipe中。
+    例如，makefile中所有target的recipe:
+        all:
+            @echo no\
+        space
+            @echo no\
+            space
+            @echo one \
+            space
+            @echo one\
+             space
+    输出如下:
+        nospace
+        nospace
+        one space
+        one space
+    更复杂的例子，该makefile:
+        all: ; @echo 'hello \
+            world' ; echo "hello \
+            world"
+    将会调用shell命令:
+        echo 'hello \
+        world' ; echo "hello \
+            world"
+    依据shell双引号的规则，输出如下:
+        hello \
+        world
+        hello world
+    注意反斜线/新行对在由双引号引起来的字符串中被移除，但是在由单引号引起的字符串中没有。这是默认shell处理反斜线/新行对的方式
+。如果你在makefile中指定一个不同的shell，结果可能不同。
+    有时，你想拆分由单引号引起的长行，但是你不想反斜线/新行出现在被引起的内容中。This is often the case when passing scripts t
+o languages such as Perl, where extraneous backslashes inside the script can change its meaning or even be a syntax error.解决
+该问题的一个简单的方式是放引起的内容或者甚至是整个命令到make变量中，随后在recipe中使用该变量。在这种情况下，引起rule的新行被使
+用且反斜线/新行被删除。如果我们使用该方法重写上面的例子:
+        HELLO = 'hello \
+        world'
+        all: ; @echo $(HELLO)
+    我们将得到如下输出:
+        hello world
+    如果你喜欢，你也可以使用特定target变量(see Target-specific Variable Values)来获得在变量和recipe中更严格的对应。
+
+5.1.2 在recipe中使用变量(_Using Variables in Recipes)
+    make处理recipe的另一种方式是通过扩展在它们中的一些变量引用。(see Basics of Variable Reference)。在make完成了读取所有的make
+file内容且target被认为过期后出现。因此，不被重建的target的recipe从来不被扩展。
+    Variable and function references in recipes have identical syntax and semantics to references elsewhere in the makefile.它
+们也有同样的引号规则:如果你想让$符号出现在recipe中，必须使用两个$。对于shell来说，使用$符号为了引用变量。时刻记着你想引用的变
+量是make变量还是shell变量是很重要的。例如:
+        LIST = one two three
+        all:
+            for i in $(LIST); do \
+                echo $$i; \
+            done
+    如下命令被传递给shell:
+        for i in one two three; do \
+            echo $i; \
+        done
+    生成期望的结果:
+        one
+        two
+        three
+
+5.2 recipe echoing(_Recipe Echoing)
+    正常情况下，在被执行前，make打印recipe中的每行。我们称它为echoing因为它给人的感觉是你自己键入的行。
+    当行以'@'开始时，该行的echoing被抑制。在行被传递给shell之前'@'被取消。典型的，你使用这个为了一个命令，它的影响只是打印一些
+东西，例如echo命令来表明进程:
+        @echo About to make distribution files
+    当make被给标记'-n'或者'--just-print'时，它仅输出大多数recipe，且不执行它们。see Summary of Options。在这种情况下，以'@'开
+始的recipe行被打印。该标记是有用的为了发现make认为哪些recipe是必要的，在实际没有做它们之前。
+    '-s'或者'--silent'标记为了阻止echoing，就像所有的recipe以'@'开头。makefile中特殊target .SILENT在没有prerequisite的情况下有
+同样的效果(see Special Built-in Target Names)。.SILENT是本质上是过时的因为'@'更灵活。
+
+5.3 recipe执行(Recipe Execution)
+    当该执行recipe来更新target时，他们通过为recipe中的每行调用新的子shell来执行，除非.ONESHELL特殊target有效(see Using One Sh-
+ell)(实际中，make在不影响结果的情况下走捷径。)
+    请注意:这表明设置shell变量和调用shell命令例如cd将不会影响recipe中接下来的行。如果你想使用cd来影响下一个语句，将两个语句放
+在同一个recipe行中。随后make将调用一个shell来运行所有行，shell将会按顺序执行语句。例如:
+        foo: bar/lose
+            cd $(@D) && gobble $(@F) > ../$@
+    在这我们使用shell AND操作符(&&)因此如果cd命令失败了，脚本尝试在错误的目录下调用gobble命令时将失败，那将引起问题。
+        * One Shell:           在recipe中一个shell为了所有行
+        * Choosing the Shell:  make怎样选择运行recipe的shell
+
+5.3.1 使用一个shell(_Using One Shell)
+    有时你想让recipe中的所有行被传递给一个shell。通常这在两种情况下是有用的:首先，它能提高makefile(包含许多命令行)的性能，通过
+避免额外的进程。其次，你可能想让新行包含在你的recipe命令中。如果.ONESHELL特殊target出现在makefile中任何地方，那么每个target的
+所有recipe将被提供给一个shell。
+    在recipe中的新行被保存。例如:
+        .ONESHELL
+        foo: bar/lose
+            cd $(@D)
+            gobble $(@F) > ../$@
+    现在尽管命令是不同的recipe行，将会按照期望执行。
+    如果.ONESHELL被提供，那么只有recipe的第一行将被核对特殊的前缀字符('@'，'-'和'+')。当shell被调用时，随后的行将包含特殊字符
+。如果你想你的recipe以这些特殊字符开始，你需要安排他们不是第一行的第一个字符，也许可以通过增加注释。例如，在Perl中将是语法错误
+因为第一个'@'被make删除了。
+        .ONESHELL
+        SHELL = /usr/bin/perl
+        .SHELLFLAGS = -e
+        show:
+            @f = qw(a, b, c)
+            print "@f\n";
+    然而，以下会正确的工作:
+        .ONESHELL
+        SHELL = /usr/bin/perl
+        .SHELLFLAGS = -e
+        show:
+            # Make sure "@" is the first character on the first line
+            @f = qw(a, b, c)
+            print "@f\n";
+    或者
+        .ONESHELL
+        SHELL = /usr/bin/perl
+        .SHELLFLAGS = -e
+        show:
+            my @f = qw(a, b, c)
+            print "@f\n";
+
+5.3.2 选择shell(_Choosing the Shell)
+    被shell使用的程序从变量SHELL中获取。如果该变量没有在你的makefile中设置，/bin/sh被用作shell。传递给shell的参数从变量.SHELLF
+LAGS中获取。.SHELLFLAGS的默认值是-c或者-ec。
+    不像大多数变量，变量SHELL从来不从环境中设置。这是因为SHELL环境变量被用来指定你私人的对shell程序的选择。像这样私人的选择影
+响makefile的功能是非常糟糕俄。see Variables from the Environment。
+
+Choosing a Shell in DOS and Windows
+
+5.4 并行执行(Parallel Execution)
+    GNU make知道怎样一次执行多个recipe。正常情况下，make一次仅执行一个recipe，在执行下一个之前等待完成。然而'-j'或者'--jobs'选
+项告诉make同时执行许多recipe。你能在特定的makefile文件中使用.NOTPARALLEL伪指令来抑制并行性。(see Special Built-in Target Names
+)
+    On MS-DOS, the '-j' option has no effect, since that system doesn't support multi-processing.
+    如果'-j'参数后跟一个整数，这是一次执行recipe的数量。这被称为工作槽(job slots)。如果在'-j'后没有整数，对工作槽没有限制。默
+认的工作槽的数量是1，意味着串行。
+    处理递归的make调用将引发并行执行的问题。为了更多信息,see Communicating Options to a Sub-make。
+    如果一个recipe失败了，且错误没有被忽略(see Errors in Recipe)，来remake同一target的剩下的recipe行将不被运行。如果recipe失败
+且'-k'或者'--keep-going'选项没有被给(see Summary of Options)，make终止执行。如果make中断且子进程正在运行，它将等待它们退出。
+    当系统过载时，你可能想运行少的job。你能使用'-l'选项来告诉make限制make一次运行的job，基于负载。'-l'或者'--max-load'选项后跟
+浮点数。例如:
+        -l 2.5
+    如果负载平均值大于2.5那么不会让make开始新的job。The '-l' option with no following number removes the load limit, if one was
+given with a previous '-l' option.
+    默认情况下，没有限制。
+        * Parallel Output:
+        * Parallel Input:
+
+5.4.1 并行执行期间的输出(Output During Parallel Execution)
+5.4.2 并行执行期间的输入(Input During Parallel Execution)
+
+5.5 recipe中的错误(_Errors in Recipes)
+5.6 中断或者杀死make(_Interrupting or Killing make)
+5.7 make的递归使用(_Recursive Use of make)
+5.7.1 MAKE变量怎样工作(_How the MAKE Variable Works)
+5.7.2 交流变量到子make(_Communicating Variables to a Sub-make)
+5.7.3 交流选项到子make(_Communicating Options to a Sub-make)
+5.7.4 '--print-directory'选项(_The '--print-directory' Option)
+5.8 Defining Canned Recipes
+5.9 使用空的recipe(_Using Empty Recipes)

@@ -1,0 +1,42 @@
+6 怎样使用变量(_How to Use Variables)
+    变量是定义在makefile中的名字来表示文本字符串(变量的值)。这些值被显式请求替换到target，prerequisite，recipes和makefile的其
+他部分。(在一些其他版本的make中，变量被称为宏(macros))。
+    在makefile中的变量和函数当读的时候被扩展，除了在recipe中，使用'='变量定义右边的，和使用define执行变量定义的内容。
+    变量能表示文件名列表，传递给编译器的参数，运行的程序，寻找源文件的指令，写输出的指令或者你能想象的任何事情。
+    变量名可以是不包含':'，'#'，'='或者空格的字符序列。然而，包含除了字符，数字和下划线之外的字符的变量应该被仔细考虑，因为在
+一些shell中，不能通过环境传递到sub-make(see Communicating Variables to a Sub-make)。以'.'开始和大写字母组成的变量拥有特殊的含
+义。
+    变量名是大小写敏感的。'foo'，'FOO'和'Foo'是不同的变量。
+    在变量名中使用大写字母是传统，但是我们推荐使用小写字母。
+    以@开头加几个字符的变量是自动变量。他们有特殊的用途。see Automatic Variables
+    * Reference:                怎样使用变量名
+    * Flavors:                  变量有两种类型
+    * Advanced:                 引用变量的高级功能
+    * Values:                   变量得到值的所有方法
+    * Setting:                  怎样设置makefile中的变量
+    * Appending:                怎样追加文本到变量的旧值上
+    * Override Directive:       尽管用户已经使用命令行参数设置它，怎样设置变量
+    * Multi-Line                将一个变量设置成多个字符串的另一种方法
+    * Undefine Directive:       怎样取消一个变量
+    * Environment:              变量值来自于环境
+    * Target-specific:          被定义在每个target上的变量值
+    * Pattern-specific:         特定的target变量值被应用到一组匹配模式的target上
+    * Suppressing Inheritance:  抑制继承变量
+    * Special Variables:        带有特殊意义或者行为的变量
+
+6.1 变量引用的基础(_Basics of Variable References)
+6.2 两种类型的变量(_The Two Flavors of Variables)
+6.3 变量引用的高级功能(_Advanced Features for Reference to Variables)
+6.3.1 替代引用(_Substitution References)
+6.3.2 计算变量名(_Computed Variable Names)
+6.4 变量怎样得到值(_How Variables Get Their Values)
+6.5 设置变量(_Setting Variables)
+6.6 追加文本到变量(_Appending More Text to Varialbes)
+6.7 override指令(_The override Directive)
+6.8 定义多行变量(_Defining Multi-Line Variables)
+6.9 取消变量(_Undefining Variables)
+6.10 来自环境的变量(_Variables from the Environment)
+6.11 特定target的变量值(_Target-specific Variable Values)
+6.12 特定模式的变量值(_Pattern-specific Variable Values)
+6.13 抑制继承(_Suppressing Inheritance)
+6.14 其他特殊的变量(_Other Special Variables)

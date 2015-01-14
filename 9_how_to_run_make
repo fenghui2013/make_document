@@ -1,0 +1,24 @@
+9 怎样运行make(_How to Run make)
+    说明怎样编译程序的makefile被各种用。最简单的使用就是重新编译过期的每个文件。通常情况下，makefile被写因此如果你执行make且无
+参数，它就做那个。
+    但是你可能只想更新一些文件。你可能想使用不同的编译器或者不同的编译器选项。你可能只想找出哪些文件过期但不改变他们。
+    当你运行make时通过传递参数，你能做到这些和其他的。
+    make的退出状态总是三个值之一:
+    0 如果make成功的退出状态是0
+    2 如果make遇到错误退出状态是2。它将打印描述特定错误的信息
+    1 如果你使用'-q'标记且make确认一些target已经过期的退出状态是1。see Instead of Executing Recipes
+    * Makefile Arguments:     怎样指定使用哪个makefile
+    * Goals:                  怎样指定goal参数来指定使用makefile中哪部分
+    * Instead of Execution:   怎样使用mode标记来指定什么类型的事情来处理makefile中的recipe而不只是执行它们
+    * Avoiding Compilation:   怎样避免重新编译某些文件
+    * Overriding:             怎样覆写一个变量来指定一个可选的编译器和其他事情
+    * Testing:                怎样越过错误继续执行来测试编译
+    * Options Summary:        选项的总结
+
+9.1 指定makefile的参数(_Arguments to Specify the Makefile)
+9.2 指定goal的参数(_Arguments to Specify the Goals)
+9.3 不执行recipe(_Instead of Executing Recipes)
+9.4 避免重新编译一些文件(_Avoiding Recompilation of Some Files)
+9.5 覆写变量(_Overriding Variables)
+9.6 测试程序编译(_Testing the Compilation of a Program)
+9.7 选项的总结(_Summary of Options)

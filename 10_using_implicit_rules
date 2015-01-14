@@ -1,0 +1,32 @@
+10 使用隐式规则(_Using Implicit Rules)
+    remake target文件的某些标准方法被经常使用。例如make一个对象文件的习惯用法是使用C编译器cc编译C源文件。
+    隐式规则告诉make怎样使用习惯技术因此你不必详细的指定它们当你想使用他们时。例如，对C编译器有一个隐式规则。文件名决定了哪个
+隐式规则被使用。例如，典型的C编译器需要.c文件和生成.o文件。因此当它看到以该后缀结尾的文件就应用隐式规则。
+    隐式规则链被依次应用。例如，make remake .y文件到.o文件通过.c文件的方式。
+    内置的隐式规则在它们的recipe中使用了几个变量，通过改变变量的值，你能改变隐式规则工作的方式。例如，变量CFLAGS控制了给C编译
+器的标记通过C编译器的隐式规则。
+    通过写模式规则你可以定义你自己的隐式规则。
+    后缀规则是定义隐式规则的一个有限制的方法。模式规则更通用和清除，但是后缀规则为了兼容性。
+    * Using Implicit:          怎样使用一个存在的隐式规则得到recipe更新文件
+    * Catalogue of Rules:      内置规则列表
+    * Implicit Variables:      怎样改变预定义规则
+    * Chained Rules:           怎样使用隐式规则链
+    * Pattern Rules:           怎样定义新的隐式规则
+    * Last Resort:             怎样定义不能发现规则recipe
+    * Suffix Rules:            旧风格的隐式规则
+    * Implicit Rule Search:    应用隐式规则的精确算法
+
+10.1 使用隐式规则(_Using Implicit Rules)
+10.2 内建规则目录(_Catalogue of Built-In Rules)
+10.3 隐式规则使用的变量(_Variables Used by Implicit Rules)
+10.4 隐式规则链(_Chains of Implicit Rules)
+10.5 定义和重定义模式规则(_Defining and Redefining Pattern Rules)
+10.5.1 模式规则的介绍(_Introduction to Pattern Rules)
+10.5.2 模式规则例子(_Pattern Rule Examples)
+10.5.3 自动变量(_Automatic Variables)
+10.5.4 模式怎样匹配(_How Patterns Match)
+10.5.5 匹配任何的模式规则(_Match-Anything Pattern Rules)
+10.5.6 取消隐式规则(_Canceling Implicit Rules)
+10.6 _Defining Last-Resort Default Rules
+10.7 旧风格的后缀规则(_Old-Fashioned Suffix Rules)
+10.8 隐式规则查找算法(_Implicit Rule Search Algorithm)

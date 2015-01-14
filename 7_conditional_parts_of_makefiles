@@ -1,0 +1,10 @@
+7 makefile中的条件部分(_Conditional Parts of Makefiles)
+    条件指令依据变量的值导致makefile中的部分被执行或者忽略。条件能比较一个与另一个的值，或者是常量字符串的值。在makefile中make
+真正看到的是条件控制的部分，因此他们不能被用来控制执行时期的recipe。
+    * Conditional Example:   条件的例子
+    * Conditional Syntax:    条件的语法
+    * Testing Flags:         测试标记的条件
+
+7.1 条件的例子(_Example of a Conditional)
+7.2 条件的语法(_Syntax of Conditional)
+7.3 测试标记的条件(_Conditionals that Test Flags)

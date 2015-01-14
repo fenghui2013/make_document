@@ -1,0 +1,32 @@
+8 转换文本的函数(_Functions for Transforming Text)
+    在recipe中函数允许你在makefile中做一些文本处理来计算文件。你能通过函数调用使用一个函数，给出函数名和一些参数为了操作的函数。
+函数处理的结果被替换入makefile中调用点，一个变量可能被替换。
+    * Syntax of Functions:          怎样写函数调用
+    * Text Functions:               一般目的的文本操作函数
+    * File Name Functions:          操作文件名的函数
+    * Conditional Functions:        实现条件的函数
+    * Foreach Functions:            带有控制变量重复一些文本
+    * File Functions:               写文本到文件
+    * Call Functions:               扩展用户定义的函数
+    * Value Functions:              返回变量未扩展的值
+    * Eval Functions:               按照makefile的语法执行参数
+    * Origin Functions:             发现变量得到值的地方
+    * Flavor Functions:             Find out the flavor of a variable.
+    * Make Control Functions:       控制make如何执行的函数
+    * Shell Functions:              替换shell命令的输出
+    * Guile Functions:              使用GNU Guile内嵌脚本语言
+
+8.1 函数调用语法(_Function Call Syntax)
+8.2 字符串替换和分析的函数(_Functions for String Substitution and Analysis)
+8.3 文件名函数(_Functions for File Names)
+8.4 条件函数(_Functions for Conditionals)
+8.5 foreach函数(_The foreach Function)
+8.6 文件函数(_The file Function)
+8.7 call函数(_The call Function)
+8.8 value函数(_The value Function)
+8.9 eval函数(_The eval Function)
+8.10 origin函数(_The origin Function)
+8.11 flavor函数(_The flavor Function)
+8.12 控制make的函数(_Functions That Control Make)
+8.13 shell函数(_The shell Function)
+8.14 guile函数(_The guile Function)
