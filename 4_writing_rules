@@ -363,4 +363,86 @@ recipe将被执行。换言之，如果自从你上次重建target之后prerequi
 4.10 规则中的多个target(Multiple Targets in a Rule)
     带有多个目标的规则和写多个规则，一个目标一个是等价的。同样的recipe应用到所有的target，但是效果可能不同因为你能使用'$@'将真
 实的target名字代替recipe。该规则也向所有的target贡献相同的prerequisite。
-    
+    在两种情况下，这是有用的:
+        * 你需要prerequisite，不需要recipe，例如:
+            kbd.o command.o files.o: command.h
+        给三个被提到的对象一个额外的prerequisite。
+        * 相似的recipe为所有的target工作。recipe不需要完全相同，因为自动变量'$@'被用来替换特殊target。例如:
+            bigoutput littleoutput: text.g
+                generate text.g -$(subst output,,$@) > $@
+        等价于
+            bigoutput: text.g
+                generate text.g -big > bigoutput
+            littleoutput: text.g
+                gennerate text.g -little > littleoutput
+        在这我们假设假想的程序generate生成两种类型的输出，如果给定'-big'是一个，如果给定'-little'是一个。see Functions for St-
+        ring Substitution and Analysis, 为了subst函数的解释。
+    假如你想根据target改变prerequisite，就像变量'$@'允许你改变recipe一样。在普通的rule里使用多个target，你不能做这个，但是你能
+使用静态模式rule(static pattern rule)来做到。see Static Pattern Rules
+
+4.11 多个rule为一个target(Multiple Rules for One Target)
+    一个文件可以是几个rule的target。在所有rule中的prerequisite被合并到target的prerequisite的列表中。如果target比任何rule的pre-
+requisite旧，recipe将被执行。
+    为一个文件仅有一个recipe将会被执行。如果多个rule为同一个文件给了recipe，make使用最后一个且打印错误消息。(作为一个特殊的例
+子，如果文件名以点号开始，没有错误消息被打印。这个古怪的行为仅是为了兼容其他的make实现。你应该避免使用。)在某些场合下，让同样
+的target调用多个recipe(makefile中不同部分定义的)。你可是使用双冒号规则(see Double-Colon)。
+    prerequisite的额外规则被使用为了一次性给几个额外的prerequisite到许多文件。例如，makefile经常有变量，例如objects，包含了在
+正在被make的系统中所有编译输出文件的列表。举例说明，如果config.h改变了，他们都需要被重新编译:
+        objects = foo.o bar.o
+        foo.o: defs.h
+        bar.o: defs.h test.h
+        $(objects): config.h
+    This could be inserted or taken out without changing the rules that really specify how to make the object files, making it
+a convenient form to use if you wish to add the additional prerequisite intermittently.
+    另一个窍门是额外的prerequisite能使用变量(你设置make的命令行参数)指定。例如:
+        extradeps=
+        $(objects): $(extradeps)
+    意味着命令'make extradeps=foo.h'将会将foo.h作为每个对象文件的prerequisite，但是'make'不会。
+    如果target的显式规则中没有recipe，那么make查找一个可应用的隐式规则来发现。see Using Implicit Rules
+
+4.12 静态模式rule(Static Pattern Rules)
+    静态模式rule是指定多个target且基于target的名字构造每个target的prerequisite的rule。在多个target是他们比普通rule更通用，因为
+target不必有相同的prerequisite。它们的prerequiste是类似的，但不必相同。
+    * Static Usage:            静态模式rule的语法
+    * Static versus Implicit:  它们比隐式规则更好用的时候
+
+4.12.1 静态模式rule的语法(Syntax of Static Pattern Rules)
+    这是静态模式rule的语法:
+        targets ...: target-pattern: prereq-patterns ...
+            recipe
+            ...
+    target列表指定了rule将应用的target。该target包含了通配符，就像普通rule一样(see Using Wildcard Characters in File Names)。
+    target-pattern和prereq-patterns说明怎样计算每个target的prerequisite。每个target匹配target-pattern为了获取target名字的部分
+被称为stem。该stem被替换到prereq-patterns中的每一个为了生成prerequisite。
+    正常情况下每个模式仅包含字符'%'一次。当target-pattern匹配target时，'%'能匹配target名字中的任何部分。该部分叫stem。模式的其
+他部分必须被精确匹配。例如，target 'foo.o'匹配模式'%.o'，'foo'是stem。target foo.c和foo.out不能匹配模式。
+    每个target的prerequisite的名字通过替换每个prerequisite模式中的'%'来生成。例如，如果一个prerequisite模式是%.c，那么stem 'f-
+oo'被替换后得到prerequisite名字foo.c。写不包含'%'的prerequisite模式是合法的。那么该prerequisite对所有的target是相同的。
+    '%' characters in pattern rules can be quoted with preceding backslashes('\').Backslashes that would otherwise quote '%' 
+characters can be quoted with more backslashes.Backslashes that quote '%' characters or other backslashes are removed from the
+pattern before it is compared to file names or has a stem substituted into it.Backslashes that are not in danger of quoting '%'
+characters go unmolested. For example,the pattern the\%weird\\%pattern\\ has 'the%weird\' preceding the operative '%' character
+, and 'patter\\' following it. The final two backslashes are left alone because they cannot affect any '%' character.
+    这是一个例子，使用相应的.c文件编译foo.o和bar.o:
+        objects = foo.o bar.o
+        all: $(objects)
+        $(objects): %.o: %.c
+            $(CC) -c $(CFLAGS) $< -O $@
+    在这'$<'是自动变量(保存prerequisite的名字)且'$@'是自动变量(保存target的名字)。see Automatic Variables
+    每个指定的target必须匹配target模式。对于不匹配的target将引发一个警告。如果你有一个文件列表，只有匹配模式的这些，你能使用
+filter函数来删除不匹配的文件名字see Functions for String Substitution and Analysis:
+        files = foo.elc bar.o lose.o
+        $(filter %.o, $(files)): %.o: %.c
+            $(CC) -c $(CFLAGS) $< -o $@
+        $(filter %.elc, $(files)): %.elc: $.el
+            emacs -f batch-byte-compile $<
+    在本例子中，'$(filter %.o, $(files))'的结果是bar.o lose.o且第一个静态模式rule通过编译相应的C源文件使每个对象文件被更新。
+'$(filter %.elc, $(files))'的结果是foo.elc，因此那个文件是foo.el。
+    另一个例子展示了在静态模式rule中怎样使用$*:
+        bigoutput littleoutput: %output: text.g
+            generate text.g -$* > $@
+    当generate运行时，$*将会扩展stem，或者'big'或者'little'。
+
+4.12.2 静态模式rule对比隐式规则(Static Pattern Rules versus Implicit Rules)
+4.13 双冒号规则(Double-Colon Rules)
+4.14 自动生成prerequisite(Generating Prerequisites Automatically)
