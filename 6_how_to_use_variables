@@ -25,8 +25,86 @@
     * Special Variables:        带有特殊意义或者行为的变量
 
 6.1 变量引用的基础(_Basics of Variable References)
+    为了使用变量的值，使用$后跟在括号或者大括号里的变量名:'$(foo)'或者'${foo}'是对变量foo的有效引用。正因为$的特殊意义，所以在
+文件名中单独的$或者recipe中你必须写'$$'。
+    变量引用能被用在任何上下文中:target，prerequisite，recipe，大多数指令和新变量的值。这是一个通用的例子，变量保存程序中所有
+对象文件的名字:
+        objects = program.o foo.o utils.o
+        program: $(objects)
+            cc -o program $(objects)
+        $(objects): defs.h
+    变量引用通过严格的文本替换工作。因此，规则:
+        foo = c
+        prog.o: prog.$(foo)
+            $(foo)$(foo) -$(foo) prog.$(foo)
+    能被用来编译C程序prog.c。由于在变量赋值时，变量之前的空格被忽略，foo的值严格是'c'。(真实情况下不要这样写你的makefile文件)
+    $后跟除$，左括号和左大括号之外的一个字符将该字符作为变量名。因此，你能使用'$x'引用变量x。然而，这种用法强烈不被推荐，除了
+在自动变量的情况下。(see Automatic Variables)
+
 6.2 两种类型的变量(_The Two Flavors of Variables)
+    在GNU make中拥有一个值有两种方法:我们称它为两种类型的变量。两种类型是重要的在它们是怎样定义的及当扩展时它们做了什么。
+    第一种类型的变量是递归扩展变量(recursively expanded variable)。这种类型的变量使用'='定义(see Setting Variables)或者通过de-
+fine指令(see Defining Multi-Line Variables)。The value you specify is installed verbatim; 如果它包含其他变量的引用，当这个变量
+被替换时这些引用被扩展。当这种情况发生时，叫递归扩展(recursive expansion)。
+    例如:
+        foo = $(bar)
+        bar = $(ugh)
+        ugh = Huh?
+        all:;echo $(foo)
+    将会echo 'Huh?':'$(foo)'扩展到'$(bar)'，'$(bar)'扩展到'ugh'，'ugh'最后扩展到'Huh?'。
+    这种类型的变量被大多数版本的make支持。它有优点也有缺点。优点是:
+        CFLAGS = $(include_dirs) -0
+        include_dirs = -Ifoo -Ibar
+    将做你想的事情:当'CFLAGS'在recipe中被扩展时，将会扩展成'-Ifoo -Ibar -0'。主要的缺点是你不能在变量的尾部追加东西，例如:
+        CFLAGS = $(CFLAGS) -0
+    因为它在变量扩展中会导致无限循环。(实际上，make发现无限循环且会报告一个错误)
+    另一个缺点是每次变量扩展时在定义中引用的函数都会被执行。这使make运行的很慢。更糟糕的是，它使wildcard和shell函数给处不可预
+料的结果，因为当它们被调用时你不能很容易的控制，甚至是次数。
+    为了避免递归扩展变量的所有问题和麻烦，有另一种类型:简单扩展变量(simply expanded variables)。
+    简单扩展变量通过使用':='或者'::='行定义(see Setting Variables)。两GNU make中两种形式是等价的。然而，只有形式'::='被POSIX标
+准支持。(2012年POSIX标准支持'::='，因此更老版本的make将不支持这种形式)。
+    简单扩展变量的值一次扩展，为了所有，扩展任何索引到其他的变量和函数，当变量被定义时。简单扩展变量的真实值是扩展你写的文本的
+结果。它不包含任何其他变量的引用。它包含它们的值就像该变量被定义一样。因此，
+        x := foo
+        y := $(x) bar
+        x := later
+    等价于
+        y := foo bar
+        x := later
+    当简单扩展变量被引用时，它的值被逐字替换。
+    这是一些更复杂的例子，说明和shell函数结合时':='的使用。(see The shell Function)这个例子也展示了变量MAKELEVEL的使用，当该变
+量从一级到另一级传递时该值被改变(see Communicating Variables to a Sub-make, for information about MAKELEVEL)
+        ifeq (0, $(MAKELEVEL))
+        whoami := $(shell whoami)
+        host-type := $(shell arch)
+        MAKE := ${MAKE} host-type=${host-type} whoami=${whoami}
+    ':='使用的优势是典型的'descend into a directory'recipe 随后看起来像这样:
+        ${subdirs}:
+            ${MAKE} -C $@ all
+    简单扩展变量通常使复杂的makefile程序更加可预知，因为它们像在大多数编程语言中的变量一样。它们允许你重新定义一个变量和更有效
+的使用扩展函数(see Functions for Transforming Text)。
+    你也能使用它们来引入可控制的前导空格进入变量值。前导空格字符在变量引用和函数调用替换之前从你的输入中被删除。这意味着你在变
+量中包含前导空格，通过使用变量引用保护它们，像这样:
+        nullstring :=
+        space := $(nullstring) # end of the line
+    在这变量space的值就是一个空格。注释'# end of the lien'仅是为了清楚。由于尾部空格字符不会从变量值中删除，行尾的空格有同样的
+效果(但是很难读)。如果你在变量值的末尾加入空格，像这样在行尾增加一行注释使它更清楚是一个好主意。相反，如果你不想在你的变量值中
+有任何空格，你必须记住不要将一个随机注释放在一些空格之后的行尾，向这样:
+        dir := /foo/bar    # directory to put the frobs in
+    在这变量dir的值是'/foo/bar    '(带有四个尾部空格)，可能不是有意的。(想象一下类似'$(dir)/file'的定义)
+    有另一个变量赋值操作符'?='。这被称为条件变量赋值操作符，因为它只有在变量还未被定义时才有用。这个语句:
+        FOO ?= bar
+    等价于这个(see The origin Function)
+        ifeq ($(origin FOO), undefined)
+            FOO = bar
+        endif
+    注意被设置为空值的变量也是被定义的，因此'?='不会被设置那个值。
+
 6.3 变量引用的高级功能(_Advanced Features for Reference to Variables)
+    该章描述一些高级功能，你能以更灵活的方式引用变量。
+    * Substitution Refs:  使用值的替换引用变量
+    * Computed Names:     计算变量引用的名字
+
 6.3.1 替代引用(_Substitution References)
 6.3.2 计算变量名(_Computed Variable Names)
 6.4 变量怎样得到值(_How Variables Get Their Values)

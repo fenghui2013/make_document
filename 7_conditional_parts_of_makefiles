@@ -6,5 +6,108 @@
     * Testing Flags:         测试标记的条件
 
 7.1 条件的例子(_Example of a Conditional)
+    下面条件的例子告诉make如果CC变量是'gcc'使用库的一个子集否则库的不同的子集。通过控制两个recipe中的哪个被用来工作。该结果是
+'CC=gcc'作为参数使make改变的不仅仅是哪个编译器被使用而且哪些库被链接。
+        libc_for_gcc = -lgnu
+        normal_libs =
+        foo: $(objects)
+        ifeq ($(CC), gcc)
+            $(CC) -o foo $(objects) $(libs_for_gcc)
+        else
+            $(CC) -o foo $(objects) $(normal_libs)
+        endif
+    该条件使用三个指令:一个ifeq，一个else和一个endif。
+    ifeq指令开始条件语句，且指定条件。它包含两个参数，被逗号分隔，被圆括号包围。变量替换在两个参数上执行且随后被比较。如果俩个参数
+匹配，跟在ifeq后的行被执行，否则它们被忽略。
+    else指令如果之前的条件失败将导致后面的行被执行。
+    endif指令结束条件语句。每一个条件语句必须以endif结尾。无条件的makefile文本跟在后面。
+    正如该例子阐述的，条件语句工作在文本级别:条件语句的行被作为makefile的一部分或者被忽略，依据条件。这是makefile中更大的语法
+单位的原因，例如rule，可能会跨越条件语句的开头或结尾。
+    当变量CC有值'gcc'时，以上例子有如下效果:
+        foo: $(objects)
+            $(CC) -o foo $(objects) $(libs_for_gcc)
+    当变量CC有其他值时，效果如下:
+        foo: $(objects)
+            $(CC) -o foo $(objects) $(normal_libs)
+    另一种写法:
+        libs_for_gcc = -lgnu
+        normal_libs =
+        ifeq ($(CC), gcc)
+            libs=$(libs_for_gcc)
+        else
+            libs=$(normal_libs)
+        endif
+        foo: $(objects)
+            $(CC) -o foo $(objects) $(libs)
+
 7.2 条件的语法(_Syntax of Conditional)
+    没有else的简单语法:
+        conditional-directive
+        text-if-true
+        endif
+    复杂条件的语法:
+        conditional-directive
+        text-if-true
+        else
+        text-if-false
+        endif
+    或者
+        conditional-directive-one
+        text-if-one-is-true
+        else conditional-directive-two
+        text-if-two-is-true
+        else
+        text-if-one-and-twn-are-false
+        endif
+    conditional-directive的语法:
+        ifeq (arg1, arg2)
+        ifeq 'arg1', 'arg2'
+        ifeq "arg1", "arg2"
+        ifeq 'arg1', "arg2"
+        ifeq "arg1", 'arg2'
+    在arg1和arg2中扩展引用且随后比较它们。如果相同，text-if-true有效，否则text-if-false有效。
+    判断一个字符串是否为空:
+        ifeq ($(strip $(foo)),)
+        text-if-empty
+        endif
+    即使$(foo)的扩展包含空格字符也会执行text-if-empty。
+        ifneq (arg1, arg2)
+        ifneq 'arg1', 'arg2'
+        ifneq "arg1", "arg2"
+        ifneq 'arg1', "arg2"
+        ifneq "arg1", 'arg2'
+    在arg1和arg2中扩展引用且随后比较它们。如果不相同，text-if-true有效，否则text-if-false有效。
+        ifdef variable-name
+    ifdef需要变量名作为参数，而不是变量的引用。该变量的值有一个非空值，text-if-true有效，否则text-if-false有效。从来没有被定义
+过的变量有一个空值。文本variable-text被扩展，因此它可以是一个变量或者扩展变量名的函数。例如:
+        bar = true
+        foo = bar
+        ifdef $(foo)
+        frobozz = yes
+        endif
+    变量引用$(foo)被扩展，得到bar，被认为是变量名。变量bar不被扩展，但是它的值被检查是否非空。
+    注意ifdef仅测试变量是否有值。它不会扩展变量来看值是否非空。因此除了foo=之外所有的定义都返回true。为了测试空值，使用ifeq($(
+foo))。例如:
+        bar = 
+        foo = $(bar)
+        ifdef foo
+        frobozz = yes
+        else
+        frobozz = no
+        endif
+    设置'frobozz'到'yes'，然而:
+        foo = 
+        ifdef foo
+        frobozz = yes
+        esle
+        frobozz = no
+        endif
+    设置'frobozz'到'no'。
+        ifndef variable-name
+    如果变量variable-name有空值，text-if-true有效。否则，text-if-false有效。扩展和variable-name的测试结果与ifdef指令一样。
+    额外的空格被允许且条件指令之前的被忽略，但是tab不允许。以'#'开始的注释可能出现在行尾。
+    另外两个指令是else和endif。这些指令写做一个词，且没有参数。在行开始和末尾的额外空格被允许且忽略。以'#'开始的注释可能出现在
+行尾。
+    条件语句影响makefile使用哪些行。如果条件是true，make使用text-if-true。如果条件是假，make忽略这些行。
+    
 7.3 测试标记的条件(_Conditionals that Test Flags)
