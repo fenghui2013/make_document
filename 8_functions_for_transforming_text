@@ -17,7 +17,78 @@
     * Guile Functions:              使用GNU Guile内嵌脚本语言
 
 8.1 函数调用语法(_Function Call Syntax)
+    函数调用类似变量引用。它能出现在任何变量引用出现的地方且使用和变量引用同样的规则扩展。函数看起来如下:
+        $(function arguments)
+    或者
+        ${function arguments}
+    function是函数名，是make的一部分。本质上你也能通过使用call内置函数创建自己的函数。
+    arguments是函数的参数。它们被与函数名被一个或者多个空格或tab分割，且如果有多于一个参数，它们被逗号分割。空格和逗号不是参数
+的一部分。你使用包含函数调用的分隔符，要么是括号要么是大括号，以配对的形式出现在参数中。另一种分隔符可以单独的出现。如果参数包
+含其他函数或者变量引用，所有引用使用相同的分隔符是最明智的。写'$(subst a,b,$(x))'，不是'$(subst a,b,${x})'。这是因为它是清楚的
+，因为分隔符的一种类型被匹配来发现引用结束。
+    为每个参数写的text被变量替换和函数调用处理来产生参数值。
+    逗号和不匹配的括号不能出现在参数中。前导空格不能出现在第一个参数的文本中。这些字符通过变量替换放入参数中。首先定义comma和
+space，它们的是逗号和空格字符，随后替换这些变量在那些字符想出现的地方，像这样:
+        comma := ,
+        empty := 
+        space := $(empty) $(empty)
+        foo := a b c
+        bar := $(subst $(space), $(comma), $(foo))
+        # bar is now 'a,b,c'
+    在这subst函数通过foo的值，使用逗号替换每个空格，替代结果。
+
 8.2 字符串替换和分析的函数(_Functions for String Substitution and Analysis)
+    这是一些操作字符串的函数:
+$(subst from, to, text)
+    在text上执行文本替换:from的每次出现被to替换。结果被函数调用替换。例如，
+        $(subst ee, EE, feet on the street)
+    替换字符串'fEEt on the strEEt'
+$(patsubst pattern, replacement, text)
+    在text中发现匹配pattern的空格分割的词，且用replacement替换它们。pattern可以包含'%'作为通配符，匹配一个词内的任何字符。如果
+replacement也包含一个'%'，'%'被在pattern中'%'匹配的文本替换。只有pattern和replacement中的第一个'%'被这样对待，任何其他子'%'不
+改变。
+    the\%weird\\%pattern\\ the%weird\ + %字符 + pattern\\
+    $(patsubst %.c, %.o, x.c.c bar.c)  ==> x.c.0 bar.o
+    $(var:pattern=replacement) 等价于 $(patsubst pattern, replacement, $(var))
+    $(var:suffix=replacement) 等价于 $(patsubst %suffix, %replacement, $(var))
+    举例，你有一个对象文件列表
+        objects = foo.o bar.o baz.o
+    为了得到相应源文件列表，你可以简单的写:
+        $(objects: .o=.c)
+    代替使用一般形式:
+        $(patsubst %.o, %.c, $(objects))
+$(strip string)
+    删除string中的前缀和后缀空格且替换内部多个空格为一个。因此'$(strip a b c )'返回'a b c'
+$(findstring find, in)
+    在in中查找find的出现。如果出现，值是find。否则，值是空的。
+        $(findstring a, a b c)
+        $(findstring a, b c)
+    产生值'a'和''(空值)。
+$(filter pattern..., text)
+    返回text中匹配任何pattern词的所有的空格分割的词，删除不匹配的词。pattern使用'%'，就像在patsubst函数中使用的pattern一样。
+        sources := foo.c bar.c baz.s ugh.h
+        foo: $(sources)
+            cc $(filter %.c %.s, $(sources)) -o foo
+$(filter-out pattern..., text)
+    与filter操作相反。
+$(sort list)
+    按字典顺序排列list中的词，删除相同的词。输出是由单个空格分割的词。
+        $(sort foo bar lose)  ==> 'bar foo lose'
+$(word n, text)
+    返回text的第n个词。n的合法值从1开始，如果n大于text中的词数，值是空的。例如
+        $(word 2, foo bar baz)  ==> 'bar'
+$(wordlist s, e, text)
+    返回text中以词s开始且以词e结尾的列表。s的合法值以1开始，e可以是0。如果s比text中词多，值为空。如果e比text中的词多，text全部
+被返回。如果s大于e，什么也不做。例如
+        $(wordlist 2, 3, foo bar baz) ==> 'bar baz'
+$(words text)
+    返回text中词的个数。
+$(firstword names...)
+    参数names作为一系列被空格分割的names。值是系列中的第一个name。names中的其他被忽略。
+        $(firstword foo bar) ==> 'foo'
+$(lastword names...)
+    返回最后一个词。
+        $(lastword foo bar) ==> 'bar'
 8.3 文件名函数(_Functions for File Names)
 8.4 条件函数(_Functions for Conditionals)
 8.5 foreach函数(_The foreach Function)
