@@ -16,8 +16,42 @@
     * Options Summary:        选项的总结
 
 9.1 指定makefile的参数(_Arguments to Specify the Makefile)
+    指定makefile名字的方法是'-f'或者'--files'。
+    如果指定多个'-f'，那么所有指定的文件被结合。
+    如果你没有使用'-f'或者'--files'，默认是GNUmakefile，makefile和Makefile。
+
 9.2 指定goal的参数(_Arguments to Specify the Goals)
+all
+clean
+mostlyclean
+distclean
+realclean
+clobber
+install
+print
+tar
+shar
+dist
+TAGS
+check
+test
 9.3 不执行recipe(_Instead of Executing Recipes)
+'-n'
+'--just-print'
+'--dry-run'
+'--recon'
+    "No-op"
+'-t'
+'--touch'
+    "Touch"
+'-q'
+'--question'
+    "Question"
+'-W file'
+'--what-if=file'
+'--assume-new=file'
+'--new-file=file'
+    "What if"
 9.4 避免重新编译一些文件(_Avoiding Recompilation of Some Files)
 9.5 覆写变量(_Overriding Variables)
 9.6 测试程序编译(_Testing the Compilation of a Program)

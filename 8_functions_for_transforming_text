@@ -89,15 +89,105 @@ $(firstword names...)
 $(lastword names...)
     返回最后一个词。
         $(lastword foo bar) ==> 'bar'
+
 8.3 文件名函数(_Functions for File Names)
+    下列函数对每个文件名执行一个特定的转换。函数的参数是以空格分割的一系列文件名。(前导和后缀空格被忽略。)系列中的每个文件名以
+同样的方式被转换且结果以单空格分隔。
+$(dir names...)
+    提取names中每个文件名的目录部分。目录部分包括最后的斜杠，如果文件名中没有斜杠，则为'./'
+        $(dir src/foo.c hacks)  ==> 'src/ ./'
+$(notdir names...)
+    提取names中除目录部分的剩余所有。如果文件名没有斜杠，则不被修改。
+        $(notdir src/foo.c hacks)  ==> 'foo.c hacks'
+$(suffix names...)
+    提取names中每个文件名的后缀。
+        $(suffix src/foo.c src-1.0/bar.c hacks)  ==> '.c .c'
+$(basename names...)
+    提取names中每个文件名除后缀以外的所有剩余部分。
+        $(basename src/foo.c src-1.0/bar hacks) ==> 'src/foo src-1.0/bar hacks'
+$(addsuffix suffix, names...)
+    $(addsuffix .c, foo bar) ==> 'foo.c bar.c'
+$(addprefix prefix, names...)
+    $(addprefix src/, foo bar)  ==> 'src/foo src/bar'
+$(join list1, list2)
+    $(join a b, .c .o)  ==> 'a.c b.o'
+$(wildcard pattern)
+    被用来检查存在性。
+$(realpath names...)
+    返回names中每个文件名的规范绝对路径。如果为链接，则返回真实路径。
+$(abspath names...)
+    返回names中每个文件名的规范绝对路径。
+
 8.4 条件函数(_Functions for Conditionals)
+    有三个函数提供了有条件的扩展。
+$(if condition, then-part [,else-part])
+    if函数提供了在函数上下文中条件扩展的支持。
+    第一个参数condition首先去掉前缀和后缀空格，随后被扩展。如果扩展为非空字符串，那么为true。如果它扩展为空字符串，那么为false。
+    如果true，第二个参数then-part被执行。
+    如果false，第三个参数else-part被执行。
+$(or condition1[, condition2[, condition3...]])
+    or函数提供一个短路OR操作。每个参数按序扩展。如果有一个参数被扩展为非空字符串，处理停止且结果为那个字符串。如果所有参数扩展
+完毕后仍为false，那么结果为空字符串。
+$(and condition1[, condition2[, condition3...]])
+    and函数提供了一个短路AND操作。每个参数按序扩展。如果有一个参数被扩展为空字符串，处理停止且结果为空字符串。如果所有参数扩展
+完毕后仍为true，那么结果是最后一个参数的扩展。
+
 8.5 foreach函数(_The foreach Function)
+    语法:
+        $(foreach var, list, text)
+    例子:
+        dirs := a b c d
+        files := $(foreach dir, $(dirs), $(wildcard $(dir)/*))
+    等价于
+        files := $(wildcard a/* b/* c/* d/*)
+    也等价于
+        find_files = $(wildcard $(dir)/*)  #注意在此为递归扩展变量
+        dirs := a b c d
+        files := $(foreach dir, $(dirs), $(find_files))
+
 8.6 文件函数(_The file Function)
+    file函数允许makefile写文件。有两种写模式:覆写和追加。
+    语法:
+        $(file op filename[, text])
+    操作符op是>(覆写)或者>>(追加)。filename是文件名。在操作符和文件名之间的空格是可选的。
+    当file函数被扩展时，所有的参数首先被扩展，随后filename文件以模式op打开。最后text被写入文件。如果text没有新行，甚至为空，最
+终换行符被写。如果text参数没有给，那什么也不做。执行file函数的结果总是空字符串。
+    如果文件不能被打开或者写操作失败将有一个致命错误。
+
 8.7 call函数(_The call Function)
+    call函数是唯一的。它被用来创建新的参数化的函数。你能写一个复杂的表达式作为一个变量的值，随后使用call来使用不同的值扩展它。
+    语法如下:
+        $(call variable, parm, parm, ...)
+    例子:
+        reverse = $(2) $(1)
+        foo = $(call reverse, a, b)  ===> 'b a'
+
 8.8 value函数(_The value Function)
+    语法:
+        $(value variable)
+    例子:
+        P = a
+        FOO = $PATH
+        all:
+            @echo $(FOO)
+            @echo $(value FOO)
+    ==>
+        aATH
+        $PATH环境变量
+
 8.9 eval函数(_The eval Function)
+    
 8.10 origin函数(_The origin Function)
+    返回结果为变量的类型。
+    'undefined'，'default'，'environment'，'environment override'，'file'，'command line'，'override'，'automatic'
 8.11 flavor函数(_The flavor Function)
+    返回结果为变量的种类。
+    'undefined'，'recursive'，'simple'
 8.12 控制make的函数(_Functions That Control Make)
+$(error text...)
+$(warning text...)
+$(info text...)
 8.13 shell函数(_The shell Function)
+    contents := $(shell cat foo)
+    设置contents为文件foo的内容，每行以空格分隔。
 8.14 guile函数(_The guile Function)
